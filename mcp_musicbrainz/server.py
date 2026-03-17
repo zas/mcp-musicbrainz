@@ -13,6 +13,10 @@ from mcp_musicbrainz import __version__
 mcp = FastMCP("MusicBrainz")
 cache = diskcache.Cache(".musicbrainz_cache")
 
+# Bump this when changing how API responses are fetched or formatted,
+# so stale cached results are automatically bypassed.
+CACHE_VERSION = 2
+
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
     __version__,
@@ -29,7 +33,7 @@ def cached_tool(expire: int = 86400) -> Callable:
             # Create a cache key from function name and arguments
             arg_str = ":".join(map(str, args))
             kwarg_str = ":".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"{func.__name__}:{arg_str}:{kwarg_str}"
+            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"
 
             if cache_key in cache:
                 return cache[cache_key]
