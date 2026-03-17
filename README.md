@@ -6,20 +6,21 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 
 | Tool | Description |
 |---|---|
-| `search_entities` | Search for any MusicBrainz entity (artist, release, recording, label, work, etc.) using Lucene syntax |
+| `search_entities` | Search for any MusicBrainz entity using Lucene syntax. Primary entry point |
+| `search_entities_fuzzy` | Typo-tolerant search with automatic exact-first fallback |
 | `search_artists` | Search for artists with filters (country, type, gender) |
 | `search_releases` | Search for releases with filters (title, artist, label, barcode) |
 | `browse_entities` | Browse entities linked to another entity with paging (e.g. all releases by an artist) |
-| `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and discography |
-| `get_artist_discography` | Paged discography (release groups) for an artist |
-| `get_release_details` | Release details including tracklist, barcode, label, and catalog number |
-| `get_release_group_details` | Release group details with type, genres, and associated releases |
+| `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and first 10 release groups |
+| `get_artist_discography` | Full paged discography (release groups) for an artist |
+| `get_release_details` | Release (specific edition) tracklist, barcode, label, and catalog number |
+| `get_release_group_details` | Release group (album concept) details with type, genres, and editions |
 | `get_recording_details` | Recording info with appearances, ISRCs, and genres |
 | `get_album_tracks` | Tracklist with durations for a release group |
 | `get_work_details` | Musical work details with composers and lyricists |
 | `get_area_details` | Geographic area info (country, city) with aliases |
-| `get_label_details` | Label info with type, area, and URLs |
-| `get_entity_relationships` | Relationships for any entity type |
+| `get_label_details` | Label info with type, area, genres, and URLs |
+| `get_entity_relationships` | Relationships for any entity type (band members, producers, etc.) |
 | `get_cover_art_urls` | Cover art image URLs from the Cover Art Archive |
 | `lookup_by_barcode` | Find a release by UPC/EAN barcode |
 
