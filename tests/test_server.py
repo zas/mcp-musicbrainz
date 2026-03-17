@@ -17,7 +17,7 @@ class TestFmtDuration:
         assert _fmt_duration(None) == "??:??"
 
     def test_zero(self):
-        assert _fmt_duration(0) == "??:??"
+        assert _fmt_duration(0) == "0:00"
 
     def test_empty_string(self):
         assert _fmt_duration("") == "??:??"
