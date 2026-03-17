@@ -595,7 +595,8 @@ def get_work_details(work_id: str) -> str:
         lang = target.get("language", "")
         lang_str = f" [{lang}]" if lang else ""
         related_works.append(
-            f"  - {rtype.capitalize()} ({direction}): {target['title']}{lang_str} | work ID: {target['id']}"
+            f"  - {rtype.capitalize()} ({direction}): {target['title']}{lang_str} "
+            f"| work ID: {target['id']}"
         )
 
     parts = [
@@ -635,6 +636,108 @@ def get_area_details(area_id: str) -> str:
     ]
     return "\n".join(parts)
 
+@mcp.tool()
+@cached_tool()
+def get_event_details(event_id: str) -> str:
+    """Get details about a music event (concert, festival, etc.)."""
+    res = musicbrainzngs.get_event_by_id(
+        event_id,
+        includes=["aliases", "tags", "url-rels"],
+    )
+    ev = res["event"]
+    aliases = ", ".join(al["alias"] for al in ev.get("alias-list", [])[:10])
+    tags = [t["name"] for t in ev.get("tag-list", [])]
+    genres = ", ".join(tags) if tags else ""
+    lifespan = ev.get("life-span", {})
+    begin = lifespan.get("begin", "?")
+    end = lifespan.get("end", "?")
+
+    parts = [
+        f"Name: {ev['name']}",
+        f"Type: {ev.get('type', 'N/A')}",
+        f"Date: {begin} to {end}",
+        f"Time: {ev.get('time', 'N/A')}",
+        f"Aliases: {aliases or 'None'}",
+        f"Tags: {genres or 'None listed'}",
+        f"MBID: {event_id}",
+    ]
+    return "\n".join(parts)
+
+
+@mcp.tool()
+@cached_tool()
+def get_instrument_details(instrument_id: str) -> str:
+    """Get details about a musical instrument."""
+    res = musicbrainzngs.get_instrument_by_id(
+        instrument_id,
+        includes=["aliases", "tags", "url-rels"],
+    )
+    inst = res["instrument"]
+    aliases = ", ".join(al["alias"] for al in inst.get("alias-list", [])[:10])
+    tags = [t["name"] for t in inst.get("tag-list", [])]
+    genres = ", ".join(tags) if tags else ""
+
+    parts = [
+        f"Name: {inst['name']}",
+        f"Type: {inst.get('type', 'N/A')}",
+        f"Description: {inst.get('description', 'N/A')}",
+        f"Aliases: {aliases or 'None'}",
+        f"Tags: {genres or 'None listed'}",
+        f"MBID: {instrument_id}",
+    ]
+    return "\n".join(parts)
+
+
+@mcp.tool()
+@cached_tool()
+def get_place_details(place_id: str) -> str:
+    """Get details about a place (venue, studio, etc.)."""
+    res = musicbrainzngs.get_place_by_id(
+        place_id,
+        includes=["aliases", "tags", "url-rels"],
+    )
+    pl = res["place"]
+    aliases = ", ".join(al["alias"] for al in pl.get("alias-list", [])[:10])
+    tags = [t["name"] for t in pl.get("tag-list", [])]
+    genres = ", ".join(tags) if tags else ""
+    coords = pl.get("coordinates", {})
+    lat = coords.get("latitude", "N/A")
+    lon = coords.get("longitude", "N/A")
+    address = pl.get("address", "N/A")
+
+    parts = [
+        f"Name: {pl['name']}",
+        f"Type: {pl.get('type', 'N/A')}",
+        f"Address: {address}",
+        f"Coordinates: {lat}, {lon}",
+        f"Aliases: {aliases or 'None'}",
+        f"Tags: {genres or 'None listed'}",
+        f"MBID: {place_id}",
+    ]
+    return "\n".join(parts)
+
+
+@mcp.tool()
+@cached_tool()
+def get_series_details(series_id: str) -> str:
+    """Get details about a series (release series, tour, etc.)."""
+    res = musicbrainzngs.get_series_by_id(
+        series_id,
+        includes=["aliases", "tags", "url-rels"],
+    )
+    sr = res["series"]
+    aliases = ", ".join(al["alias"] for al in sr.get("alias-list", [])[:10])
+    tags = [t["name"] for t in sr.get("tag-list", [])]
+    genres = ", ".join(tags) if tags else ""
+
+    parts = [
+        f"Name: {sr['name']}",
+        f"Type: {sr.get('type', 'N/A')}",
+        f"Aliases: {aliases or 'None'}",
+        f"Tags: {genres or 'None listed'}",
+        f"MBID: {series_id}",
+    ]
+    return "\n".join(parts)
 
 @mcp.tool()
 @cached_tool()
@@ -708,7 +811,10 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
             musicbrainzngs.get_recording_by_id,
             ["artist-rels", "work-rels", "url-rels"],
         ),
-        "work": (musicbrainzngs.get_work_by_id, ["artist-rels", "work-rels", "url-rels"]),
+        "work": (
+            musicbrainzngs.get_work_by_id,
+            ["artist-rels", "work-rels", "url-rels"],
+        ),
         "label": (musicbrainzngs.get_label_by_id, ["artist-rels", "url-rels"]),
         "area": (musicbrainzngs.get_area_by_id, ["area-rels", "url-rels"]),
         "place": (musicbrainzngs.get_place_by_id, ["place-rels", "url-rels"]),
@@ -788,7 +894,10 @@ def get_release_group_cover_art(release_group_id: str) -> str:
         # A 404 error from the archive simply means no art is uploaded yet,
         # which is common. We catch it here to return a friendly message to the AI.
         if e.cause and getattr(e.cause, 'code', None) == 404:
-            return f"No cover art available for release group {release_group_id} in the archive."
+            return (
+                f"No cover art available for release group {release_group_id} "
+                "in the archive."
+            )
         # If it's a different error (like 503), let the @cached_tool decorator handle it
         raise e
 
@@ -796,7 +905,10 @@ def get_release_group_cover_art(release_group_id: str) -> str:
     if not img_list:
         return "No cover art images available."
     
-    lines = [f"Cover art for release group {release_group_id} ({len(img_list)} images):"]
+    lines = [
+        f"Cover art for release group {release_group_id} "
+        f"({len(img_list)} images):"
+    ]
     for img in img_list:
         types = ", ".join(img.get("types", ["Unknown"]))
         lines.append(f"- [{types}] {img.get('image', 'N/A')}")
