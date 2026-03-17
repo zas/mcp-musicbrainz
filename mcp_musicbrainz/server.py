@@ -82,6 +82,30 @@ VALID_LINKED_TYPES = {
     "work",
     "area",
     "collection",
+    "track",
+    "track_artist",
+}
+
+# Valid (entity_type, linked_type) browse combinations per MusicBrainz API.
+# Note: "areas" browse is not supported by musicbrainzngs.
+VALID_BROWSE_COMBINATIONS: dict[str, set[str]] = {
+    "artists": {"area", "collection", "recording", "release", "release_group", "work"},
+    "events": {"area", "artist", "collection", "place"},
+    "labels": {"area", "collection", "release"},
+    "places": {"area", "collection"},
+    "recordings": {"artist", "collection", "release", "work"},
+    "releases": {
+        "area",
+        "artist",
+        "collection",
+        "label",
+        "track",
+        "track_artist",
+        "recording",
+        "release_group",
+    },
+    "release-groups": {"artist", "collection", "release"},
+    "works": {"artist", "collection"},
 }
 
 
@@ -128,6 +152,22 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
     PRIMARY DATA SOURCE. Search for artists, releases, or recordings.
     If an exact search (e.g., 'artist:Name') returns 0 results,
     try a broader search with just the name string.
+    If still 0 results, use search_entities_fuzzy for typo-tolerant matching.
+
+    Entity hierarchy (IDs are NOT interchangeable):
+    - artist: a person or group
+    - release-group: an "album" concept (e.g. "Nevermind")
+      — has type (Album, EP, Single)
+    - release: a specific edition of a release-group (e.g. US CD vs JP vinyl)
+      - a release contains one or more media (disc 1, disc 2, etc.)
+      - each medium contains tracks (with position and optional title override)
+    - recording: a unique audio track (a song). Tracks on a release point to recordings.
+    - work: an abstract composition (lyrics + music), independent of any recording
+    - label: a record label that publishes releases (not release-groups)
+
+    Every ID returned is an MBID (UUID) bound to a specific entity type.
+    An MBID from a release-group CANNOT be used as a release_id, and vice versa.
+    Always track which entity type an ID belongs to and pass it to the matching tool.
     """
     if entity_type not in SEARCH_FUNCS:
         return (
@@ -142,7 +182,7 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
         name = i.get("name") or i.get("title")
         disambig = i.get("disambiguation", "")
         extra = f" ({disambig})" if disambig else ""
-        lines.append(f"- {name}{extra} | ID: {i['id']}")
+        lines.append(f"- {name}{extra} | {entity_type} ID: {i['id']}")
     return "\n".join(lines)
 
 
@@ -158,6 +198,12 @@ def browse_entities(
     """
     Browse MusicBrainz entities linked to another entity, with paging.
     Useful for getting complete discographies, all releases on a label, etc.
+
+    Common combinations:
+    - release-groups by artist: full discography
+    - releases by release_group: all editions of an album
+    - releases by label: label's catalog
+    - recordings by artist: all recorded tracks
 
     Args:
         entity_type: What to list (releases, recordings, release-groups,
@@ -175,10 +221,11 @@ def browse_entities(
         )
     # Normalize hyphenated linked_type to underscore for musicbrainzngs kwargs
     normalized = linked_type.replace("-", "_")
-    if normalized not in VALID_LINKED_TYPES:
+    valid_for_entity = VALID_BROWSE_COMBINATIONS.get(entity_type, set())
+    if normalized not in valid_for_entity:
         return (
-            f"Invalid linked type '{linked_type}'. "
-            f"Choose from: {', '.join(sorted(VALID_LINKED_TYPES))}"
+            f"Invalid linked type '{linked_type}' for {entity_type}. "
+            f"Valid linked types: {', '.join(sorted(valid_for_entity))}"
         )
 
     result = BROWSE_FUNCS[entity_type](
@@ -196,7 +243,7 @@ def browse_entities(
         rtype = i.get("type") or i.get("primary-type", "")
         extra = " | ".join(filter(None, [date, rtype]))
         extra_str = f" ({extra})" if extra else ""
-        lines.append(f"- {name}{extra_str} | ID: {i['id']}")
+        lines.append(f"- {name}{extra_str} | {singular} ID: {i['id']}")
     return "\n".join(lines)
 
 
@@ -211,6 +258,8 @@ def search_artists(
 ) -> str:
     """
     Search for artists with specific filters.
+    Prefer search_entities for simple name searches; use this when filtering
+    by country, type, or gender.
     Args:
         name: Artist name
         country: ISO 3166-1 alpha-2 country code
@@ -233,7 +282,7 @@ def search_artists(
         aname = i.get("name")
         disambig = i.get("disambiguation", "")
         extra = f" ({disambig})" if disambig else ""
-        lines.append(f"- {aname}{extra} | ID: {i['id']}")
+        lines.append(f"- {aname}{extra} | artist ID: {i['id']}")
     return "\n".join(lines)
 
 
@@ -248,6 +297,8 @@ def search_releases(
 ) -> str:
     """
     Search for releases with specific filters.
+    Prefer search_entities for simple title searches; use this when filtering
+    by artist, label, or barcode.
     Args:
         title: Release title
         artist: Artist name
@@ -275,7 +326,7 @@ def search_releases(
         rtitle = i.get("title")
         rartist = i.get("artist-credit-phrase", "Unknown")
         date = i.get("date", "?")
-        lines.append(f"- {rtitle} by {rartist} ({date}) | ID: {i['id']}")
+        lines.append(f"- {rtitle} by {rartist} ({date}) | release ID: {i['id']}")
     return "\n".join(lines)
 
 
@@ -285,6 +336,7 @@ def get_artist_details(artist_id: str) -> str:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
     and their discography (Release Groups) with MBIDs.
+    Shows first 10 release groups; use get_artist_discography for the full paged list.
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -312,7 +364,9 @@ def get_artist_details(artist_id: str) -> str:
     for rg in rg_list:
         rtype = rg.get("type", "Unknown")
         date = rg.get("first-release-date", "????")
-        albums.append(f"  - {rg['title']} ({date}) [{rtype}] | ID: {rg['id']}")
+        albums.append(
+            f"  - {rg['title']} ({date}) [{rtype}] | release-group ID: {rg['id']}"
+        )
 
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
@@ -352,6 +406,7 @@ def get_artist_discography(
 ) -> str:
     """
     Get a paged discography (release groups) for an artist.
+    Use this for complete discographies; get_artist_details only shows the first 10.
     Args:
         artist_id: The MBID
         limit: Max results (default 25)
@@ -369,16 +424,16 @@ def get_artist_discography(
     for i in items:
         rtype = i.get("type", "Unknown")
         date = i.get("first-release-date", "????")
-        lines.append(f"- {i['title']} ({date}) [{rtype}] | ID: {i['id']}")
+        lines.append(f"- {i['title']} ({date}) [{rtype}] | release-group ID: {i['id']}")
     return "\n".join(lines)
 
 
 @mcp.tool()
 @cached_tool()
 def get_release_details(release_id: str) -> str:
-    """
-    Get tracklist with durations, barcode, and label for a specific release.
-    """
+    """Get tracklist with durations, barcode, and label for a specific release.
+    Takes a release_id (a specific edition), NOT a release_group_id.
+    To get tracks for an album concept, use get_album_tracks with a release_group_id."""
     res = musicbrainzngs.get_release_by_id(
         release_id,
         includes=[
@@ -421,8 +476,8 @@ def get_release_details(release_id: str) -> str:
 @cached_tool()
 def get_recording_details(recording_id: str) -> str:
     """
-    Find which albums a specific recording (song) appears on,
-    including artist credits, ISRCs, and genres.
+    Get recording details: artist, duration, ISRCs, genres, and which
+    releases (albums/singles) it appears on.
     """
     res = musicbrainzngs.get_recording_by_id(
         recording_id,
@@ -436,7 +491,7 @@ def get_recording_details(recording_id: str) -> str:
     )
     rec = res["recording"]
     releases = [
-        f"  - {rel['title']} ({rel.get('date', '?')}) | ID: {rel['id']}"
+        f"  - {rel['title']} ({rel.get('date', '?')}) | release ID: {rel['id']}"
         for rel in rec.get("release-list", [])
     ]
     isrcs = ", ".join(rec.get("isrc-list", [])) or "None"
@@ -461,7 +516,9 @@ def get_recording_details(recording_id: str) -> str:
 @mcp.tool()
 @cached_tool()
 def get_album_tracks(release_group_id: str) -> str:
-    """Fetches the tracklist with durations for a specific album ID. (Cached)"""
+    """Fetches the tracklist with durations for a release group (album/EP/single).
+    Takes a release_group_id (NOT a release_id). For a specific release's tracklist,
+    use get_release_details instead."""
     rg_result = musicbrainzngs.get_release_group_by_id(
         release_group_id, includes=["releases"]
     )
@@ -480,7 +537,9 @@ def get_album_tracks(release_group_id: str) -> str:
 @mcp.tool()
 @cached_tool()
 def get_release_group_details(release_group_id: str) -> str:
-    """Get details about a release group (album, EP, single)."""
+    """Get details about a release group (the album/EP/single concept).
+    A release group contains one or more releases (specific editions).
+    Use get_release_details for a specific edition's tracklist and barcode."""
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
         includes=["artists", "releases", "tags", "ratings", "url-rels"],
@@ -493,7 +552,7 @@ def get_release_group_details(release_group_id: str) -> str:
     date = rg.get("first-release-date", "Unknown")
 
     releases = [
-        f"  - {r['title']} ({r.get('date', '?')}) | ID: {r['id']}"
+        f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}"
         for r in rg.get("release-list", [])
     ]
 
@@ -566,9 +625,7 @@ def get_area_details(area_id: str) -> str:
 @mcp.tool()
 @cached_tool()
 def get_label_details(label_id: str) -> str:
-    """
-    Get details about a record label including type, area, and associated releases.
-    """
+    """Get details about a record label including type, area, genres, and URLs."""
     res = musicbrainzngs.get_label_by_id(
         label_id,
         includes=["aliases", "tags", "ratings", "url-rels"],
@@ -611,7 +668,7 @@ def lookup_by_barcode(barcode: str) -> str:
     for r in releases:
         artist = r.get("artist-credit-phrase", "Unknown")
         date = r.get("date", "?")
-        lines.append(f"- {r['title']} by {artist} ({date}) | ID: {r['id']}")
+        lines.append(f"- {r['title']} by {artist} ({date}) | release ID: {r['id']}")
     return "\n".join(lines)
 
 
@@ -619,11 +676,12 @@ def lookup_by_barcode(barcode: str) -> str:
 @cached_tool()
 def get_entity_relationships(entity_type: str, entity_id: str) -> str:
     """
-    Get relationships for any entity type.
+    Get relationships for any entity type (e.g., band members, producers,
+    recording studios, Wikipedia links).
     Args:
         entity_type: artist, release, release-group, recording, work, label, area,
                      place, event, instrument, series
-        entity_id: The MBID
+        entity_id: The MBID (must match the entity_type)
     """
     valid_types = {
         "artist": (musicbrainzngs.get_artist_by_id, ["artist-rels", "url-rels"]),
@@ -684,10 +742,10 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
 @mcp.tool()
 @cached_tool()
 def get_cover_art_urls(release_id: str) -> str:
-    """
-    Get cover art image URLs for a release from the Cover Art Archive.
-    Returns URLs for front/back covers and thumbnails.
-    """
+    """Get cover art image URLs for a specific release (edition)
+    from the Cover Art Archive.
+    Takes a release_id, NOT a release_group_id.
+    Returns URLs for front/back covers and thumbnails."""
     images = musicbrainzngs.get_image_list(release_id)
     img_list = images.get("images", [])
     if not img_list:
@@ -706,14 +764,18 @@ def get_cover_art_urls(release_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def search_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
+def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
-    FUZZY SEARCH. Use this ONLY if the standard search_entities returns 0 results.
+    Typo-tolerant fuzzy search. Tries an exact search first, then falls back to
+    fuzzy matching if no results are found.
     Supports 'artist', 'release', 'recording', 'label', and 'work'.
-    Automatically applies fuzzy matching (e.g., 'Tugie' -> 'Tuğçe').
+    Use when the query may contain misspellings (e.g., 'Bjork' -> 'Björk').
     """
-    # We append the tilde ~ to each word in the query to trigger Lucene fuzzy matching
-    fuzzy_query = " ".join([f"{word}~" for word in query.split()])
+    # Try exact search first
+    exact = search_entities(entity_type=entity_type, query=query, limit=limit)
+    if not exact.startswith("Found 0"):
+        return exact
 
-    # We can reuse your existing search_entities logic or call it directly
+    # Fall back to fuzzy matching
+    fuzzy_query = " ".join([f"{word}~" for word in query.split()])
     return search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)

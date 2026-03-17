@@ -72,5 +72,5 @@ def test_search_artists_mock():
     ):
         res = search_artists("Test Artist")
         assert "Found 2 artists" in res
-        assert "Artist 1 (D1) | ID: id1" in res
-        assert "Artist 2 | ID: id2" in res
+        assert "Artist 1 (D1) | artist ID: id1" in res
+        assert "Artist 2 | artist ID: id2" in res
