@@ -575,7 +575,7 @@ def get_work_details(work_id: str) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
     res = musicbrainzngs.get_work_by_id(
         work_id,
-        includes=["artist-rels", "tags", "ratings"],
+        includes=["artist-rels", "work-rels", "tags", "ratings"],
     )
     w = res["work"]
     tags = [t["name"] for t in w.get("tag-list", [])]
@@ -587,6 +587,17 @@ def get_work_details(work_id: str) -> str:
         artist = rel["artist"]["name"]
         creators.append(f"  - {rtype.capitalize()}: {artist}")
 
+    related_works = []
+    for rel in w.get("work-relation-list", []):
+        rtype = rel["type"]
+        direction = rel.get("direction", "")
+        target = rel["work"]
+        lang = target.get("language", "")
+        lang_str = f" [{lang}]" if lang else ""
+        related_works.append(
+            f"  - {rtype.capitalize()} ({direction}): {target['title']}{lang_str} | work ID: {target['id']}"
+        )
+
     parts = [
         f"Title: {w['title']}",
         f"Type: {w.get('type', 'Unknown')}",
@@ -595,6 +606,9 @@ def get_work_details(work_id: str) -> str:
         "\nCreators:",
         *(creators or ["  - No creators listed"]),
     ]
+    if related_works:
+        parts.append("\nRelated works:")
+        parts.extend(related_works)
     return "\n".join(parts)
 
 
@@ -694,7 +708,7 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
             musicbrainzngs.get_recording_by_id,
             ["artist-rels", "work-rels", "url-rels"],
         ),
-        "work": (musicbrainzngs.get_work_by_id, ["artist-rels", "url-rels"]),
+        "work": (musicbrainzngs.get_work_by_id, ["artist-rels", "work-rels", "url-rels"]),
         "label": (musicbrainzngs.get_label_by_id, ["artist-rels", "url-rels"]),
         "area": (musicbrainzngs.get_area_by_id, ["area-rels", "url-rels"]),
         "place": (musicbrainzngs.get_place_by_id, ["place-rels", "url-rels"]),
