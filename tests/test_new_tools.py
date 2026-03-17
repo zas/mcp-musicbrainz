@@ -74,3 +74,50 @@ def test_search_artists_mock():
         assert "Found 2 artists" in res
         assert "Artist 1 (D1) | artist ID: id1" in res
         assert "Artist 2 | artist ID: id2" in res
+
+def test_get_release_group_cover_art_success():
+    mock_result = {
+        "images": [
+            {
+                "types": ["Front"],
+                "image": "http://example.com/front.jpg",
+                "thumbnails": {"500": "http://example.com/front-500.jpg"},
+            }
+        ]
+    }
+
+    class MockCache(dict):
+        def set(self, key, value, expire=None):
+            self[key] = value
+
+    with (
+        mock.patch("musicbrainzngs.get_release_group_image_list", return_value=mock_result),
+        mock.patch("mcp_musicbrainz.server.cache", MockCache()),
+    ):
+        from mcp_musicbrainz.server import get_release_group_cover_art
+        
+        res = get_release_group_cover_art("test-rg-id")
+        assert "Cover art for release group test-rg-id (1 images):" in res
+        assert "[Front] http://example.com/front.jpg" in res
+        assert "Thumbnail: http://example.com/front-500.jpg" in res
+
+
+def test_get_release_group_cover_art_404():
+    class MockCause:
+        code = 404
+
+    class MockCache(dict):
+        def set(self, key, value, expire=None):
+            self[key] = value
+
+    # Simulate a 404 ResponseError from the Cover Art Archive
+    mock_error = musicbrainzngs.ResponseError(cause=MockCause())
+
+    with (
+        mock.patch("musicbrainzngs.get_release_group_image_list", side_effect=mock_error),
+        mock.patch("mcp_musicbrainz.server.cache", MockCache()),
+    ):
+        from mcp_musicbrainz.server import get_release_group_cover_art
+        
+        res = get_release_group_cover_art("test-rg-id")
+        assert "No cover art available for release group test-rg-id in the archive." in res
