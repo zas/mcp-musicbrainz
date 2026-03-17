@@ -775,6 +775,37 @@ def get_cover_art_urls(release_id: str) -> str:
                 lines.append(f"  Thumbnail: {thumb_url}")
     return "\n".join(lines)
 
+@mcp.tool()
+@cached_tool()
+def get_release_group_cover_art(release_group_id: str) -> str:
+    """Get cover art image URLs for a release group (album/EP concept)
+    from the Cover Art Archive.
+    Takes a release_group_id, NOT a release_id.
+    Returns URLs for front covers and thumbnails."""
+    try:
+        images = musicbrainzngs.get_release_group_image_list(release_group_id)
+    except musicbrainzngs.ResponseError as e:
+        # A 404 error from the archive simply means no art is uploaded yet,
+        # which is common. We catch it here to return a friendly message to the AI.
+        if e.cause and getattr(e.cause, 'code', None) == 404:
+            return f"No cover art available for release group {release_group_id} in the archive."
+        # If it's a different error (like 503), let the @cached_tool decorator handle it
+        raise e
+
+    img_list = images.get("images", [])
+    if not img_list:
+        return "No cover art images available."
+    
+    lines = [f"Cover art for release group {release_group_id} ({len(img_list)} images):"]
+    for img in img_list:
+        types = ", ".join(img.get("types", ["Unknown"]))
+        lines.append(f"- [{types}] {img.get('image', 'N/A')}")
+        thumbs = img.get("thumbnails", {})
+        if thumbs:
+            thumb_url = thumbs.get("500") or thumbs.get("large", "")
+            if thumb_url:
+                lines.append(f"  Thumbnail: {thumb_url}")
+    return "\n".join(lines)
 
 @mcp.tool()
 @cached_tool()
