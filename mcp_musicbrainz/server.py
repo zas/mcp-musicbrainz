@@ -125,6 +125,9 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
     - 'artist:Nirvana AND country:US'
     - 'release:Nevermind'
     - 'recording:"Smells Like Teen Spirit"'
+    PRIMARY DATA SOURCE. Search for artists, releases, or recordings.
+    If an exact search (e.g., 'artist:Name') returns 0 results,
+    try a broader search with just the name string.
     """
     if entity_type not in SEARCH_FUNCS:
         return (
@@ -699,3 +702,18 @@ def get_cover_art_urls(release_id: str) -> str:
             if thumb_url:
                 lines.append(f"  Thumbnail: {thumb_url}")
     return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
+def search_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
+    """
+    FUZZY SEARCH. Use this ONLY if the standard search_entities returns 0 results.
+    Supports 'artist', 'release', 'recording', 'label', and 'work'.
+    Automatically applies fuzzy matching (e.g., 'Tugie' -> 'Tuğçe').
+    """
+    # We append the tilde ~ to each word in the query to trigger Lucene fuzzy matching
+    fuzzy_query = " ".join([f"{word}~" for word in query.split()])
+
+    # We can reuse your existing search_entities logic or call it directly
+    return search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)

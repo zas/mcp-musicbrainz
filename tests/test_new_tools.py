@@ -66,8 +66,10 @@ def test_search_artists_mock():
             self[key] = value
 
     # Mock the cache to avoid actual disk writes in tests
-    with mock.patch("musicbrainzngs.search_artists", return_value=mock_result), \
-         mock.patch("mcp_musicbrainz.server.cache", MockCache()):
+    with (
+        mock.patch("musicbrainzngs.search_artists", return_value=mock_result),
+        mock.patch("mcp_musicbrainz.server.cache", MockCache()),
+    ):
         res = search_artists("Test Artist")
         assert "Found 2 artists" in res
         assert "Artist 1 (D1) | ID: id1" in res
