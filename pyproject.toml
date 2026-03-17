@@ -1,0 +1,43 @@
+[project]
+name = "mcp-musicbrainz"
+version = "0.1.0"
+description = "MCP server for querying the MusicBrainz music database"
+readme = "README.md"
+license = "GPL-3.0-or-later"
+requires-python = ">=3.12"
+keywords = ["mcp", "musicbrainz", "music", "metadata"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Topic :: Multimedia :: Sound/Audio",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3.12",
+]
+dependencies = [
+    "diskcache>=5.6.3",
+    "fastmcp>=3.1.1",
+    "musicbrainzngs>=0.7.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/zas/mcp-musicbrainz"
+Repository = "https://github.com/zas/mcp-musicbrainz"
+Issues = "https://github.com/zas/mcp-musicbrainz/issues"
+
+[project.scripts]
+mcp-musicbrainz = "mcp_musicbrainz.server:mcp.run"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.15.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PT"]
