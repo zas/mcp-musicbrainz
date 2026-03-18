@@ -328,7 +328,7 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
-def get_artist_details(artist_id: str, alias_limit: int = 10) -> str:
+def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
     and their discography (Release Groups) with MBIDs.
@@ -379,8 +379,8 @@ def get_artist_details(artist_id: str, alias_limit: int = 10) -> str:
     if urls:
         parts.append(f"URLs:\n{urls}")
     parts.append(
-        f"\nDISCOGRAPHY (Showing first 10 of {len(rg_list)} release groups. "
-        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:10])
+        f"\nDISCOGRAPHY (Showing first {discography_limit} of {len(rg_list)} release groups. "
+        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:discography_limit])
     )
     return "\n".join(parts)
 
@@ -462,7 +462,7 @@ def get_release_details(release_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_recording_details(recording_id: str) -> str:
+def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     """
     Get recording details: artist, duration, ISRCs, genres, and which
     releases (albums/singles) it appears on.
@@ -495,7 +495,7 @@ def get_recording_details(recording_id: str) -> str:
         f"Genres: {genres or 'None listed'}",
         f"MBID: {recording_id}",
         f"\nAppears on ({len(releases)} releases):",
-        *releases[:25],
+        *releases[:releases_limit],
     ]
     return "\n".join(parts)
 
@@ -519,7 +519,7 @@ def get_album_tracks(release_group_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_release_group_details(release_group_id: str) -> str:
+def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
     A release group contains one or more releases (specific editions).
     Use get_release_details for a specific edition's tracklist and barcode."""
@@ -544,7 +544,7 @@ def get_release_group_details(release_group_id: str) -> str:
         f"Genres: {genres or 'None listed'}",
         f"MBID: {release_group_id}",
         f"\nReleases in this group ({len(releases)}):",
-        *releases[:25],
+        *releases[:releases_limit],
     ]
     return "\n".join(parts)
 
