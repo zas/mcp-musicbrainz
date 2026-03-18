@@ -466,7 +466,7 @@ def get_artist_discography(
         artist=artist_id,
         limit=min(limit, 100),
         offset=offset,
-        release_group_includes=["releases"],
+        includes=["releases"],
     )
     items = res.get("release-group-list", [])
     count = res.get("release-group-count", len(items))
