@@ -24,6 +24,13 @@ musicbrainzngs.set_useragent(
 )
 
 
+ID_HINT: dict[str, str] = {
+    "get_release_details": "If you have a release-group ID, use get_release_group_details or get_album_tracks instead.",
+    "get_release_group_details": "If you have a release ID, use get_release_details instead.",
+    "get_album_tracks": "If you have a release ID, use get_release_details instead.",
+}
+
+
 def cached_tool(expire: int = 86400) -> Callable:
     """Decorator to cache tool results and handle MusicBrainz errors."""
 
@@ -43,7 +50,9 @@ def cached_tool(expire: int = 86400) -> Callable:
                 cache.set(cache_key, result, expire=expire)
                 return result
             except musicbrainzngs.MusicBrainzError as e:
-                return _mb_error_message(e)
+                msg = _mb_error_message(e)
+                hint = ID_HINT.get(func.__name__, "")
+                return f"{msg} {hint}".strip() if hint else msg
             except Exception as e:
                 return f"An unexpected error occurred: {e}"
 
