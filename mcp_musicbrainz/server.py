@@ -24,16 +24,23 @@ musicbrainzngs.set_useragent(
 )
 
 
+ID_HINT: dict[str, str] = {
+    "get_release_details": "If you have a release-group ID, use get_release_group_details or get_album_tracks instead.",
+    "get_release_group_details": "If you have a release ID, use get_release_details instead.",
+    "get_album_tracks": "If you have a release ID, use get_release_details instead.",
+}
+
+
 def cached_tool(expire: int = 86400) -> Callable:
     """Decorator to cache tool results and handle MusicBrainz errors."""
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., str]) -> Callable[..., str]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> str:
             # Create a cache key from function name and arguments
             arg_str = ":".join(map(str, args))
             kwarg_str = ":".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"
+            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"  # type: ignore[union-attr]
 
             if cache_key in cache:
                 return cache[cache_key]
@@ -43,7 +50,9 @@ def cached_tool(expire: int = 86400) -> Callable:
                 cache.set(cache_key, result, expire=expire)
                 return result
             except musicbrainzngs.MusicBrainzError as e:
-                return _mb_error_message(e)
+                msg = _mb_error_message(e)
+                hint = ID_HINT.get(func.__name__, "")  # type: ignore[union-attr]
+                return f"{msg} {hint}".strip() if hint else msg
             except Exception as e:
                 return f"An unexpected error occurred: {e}"
 
@@ -302,7 +311,7 @@ def search_releases(
         barcode: UPC/EAN barcode
         limit: Max results (default 5)
     """
-    kwargs = {"limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit}
     if title:
         kwargs["release"] = title
     if artist:
@@ -328,11 +337,56 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
-def get_artist_details(artist_id: str) -> str:
+def search_release_groups(
+    title: str | None = None,
+    artist: str | None = None,
+    release_group_type: str | None = None,
+    limit: int = 5,
+) -> str:
+    """
+    Search for release groups (albums/EPs/singles) with specific filters.
+    Prefer search_entities for simple title searches; use this when filtering
+    by artist or type.
+    Args:
+        title: Release group title
+        artist: Artist name
+        release_group_type: 'album', 'ep', 'single', 'broadcast', 'other'
+        limit: Max results (default 5)
+    """
+    kwargs: dict[str, Any] = {"limit": limit}
+    if title:
+        kwargs["releasegroup"] = title
+    if artist:
+        kwargs["artist"] = artist
+    if release_group_type:
+        kwargs["type"] = release_group_type
+
+    if not any((title, artist, release_group_type)):
+        return "Please provide at least one search parameter."
+
+    result = musicbrainzngs.search_release_groups(**kwargs)
+    items = result.get("release-group-list", [])
+    lines = [f"Found {len(items)} release groups:"]
+    for i in items:
+        rgtitle = i.get("title")
+        rgartist = i.get("artist-credit-phrase", "Unknown")
+        rgtype = i.get("type", "?")
+        date = i.get("first-release-date", "?")
+        lines.append(f"- {rgtitle} by {rgartist} ({date}) [{rgtype}] | release-group ID: {i['id']}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
+def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
     and their discography (Release Groups) with MBIDs.
-    Shows first 10 release groups; use get_artist_discography for the full paged list.
+    Shows first release groups; use get_artist_discography for the full paged list.
+    Args:
+        artist_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+        discography_limit: Max number of release groups to show (default 10)
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -347,7 +401,7 @@ def get_artist_details(artist_id: str) -> str:
     a = res["artist"]
     tags = [t["name"] for t in a.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
     rg_list = sorted(
@@ -379,8 +433,8 @@ def get_artist_details(artist_id: str) -> str:
     if urls:
         parts.append(f"URLs:\n{urls}")
     parts.append(
-        f"\nDISCOGRAPHY (Showing first 10 of {len(rg_list)} release groups. "
-        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:10])
+        f"\nDISCOGRAPHY (Showing first {discography_limit} of {len(rg_list)} release groups. "
+        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:discography_limit])
     )
     return "\n".join(parts)
 
@@ -462,10 +516,13 @@ def get_release_details(release_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_recording_details(recording_id: str) -> str:
+def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     """
     Get recording details: artist, duration, ISRCs, genres, and which
     releases (albums/singles) it appears on.
+    Args:
+        recording_id: The MBID
+        releases_limit: Max number of releases to show (default 25)
     """
     res = musicbrainzngs.get_recording_by_id(
         recording_id,
@@ -495,8 +552,14 @@ def get_recording_details(recording_id: str) -> str:
         f"Genres: {genres or 'None listed'}",
         f"MBID: {recording_id}",
         f"\nAppears on ({len(releases)} releases):",
-        *releases[:25],
+        *releases[:releases_limit],
     ]
+    if len(releases) > releases_limit:
+        parts.append(
+            f"  ... and {len(releases) - releases_limit} more."
+            f" Use browse_entities(entity_type='releases', linked_type='recording',"
+            f" linked_id='{recording_id}') for the full list."
+        )
     return "\n".join(parts)
 
 
@@ -513,16 +576,26 @@ def get_album_tracks(release_group_id: str) -> str:
 
     release_id = releases[0]["id"]
     release_details = musicbrainzngs.get_release_by_id(release_id, includes=["recordings"])
-    tracks = _format_tracks(release_details["release"].get("medium-list", []))
-    return "\n".join(tracks) if tracks else "No tracks found."
+    r = release_details["release"]
+    tracks = _format_tracks(r.get("medium-list", []))
+    if not tracks:
+        return "No tracks found."
+    header = f"Tracklist from release: {r.get('title', '?')} ({r.get('date', '?')}) | release ID: {release_id}"
+    if len(releases) > 1:
+        header += f"\n({len(releases)} releases available; use get_release_group_details to see all editions)"
+    return header + "\n" + "\n".join(tracks)
 
 
 @mcp.tool()
 @cached_tool()
-def get_release_group_details(release_group_id: str) -> str:
+def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
     A release group contains one or more releases (specific editions).
-    Use get_release_details for a specific edition's tracklist and barcode."""
+    Use get_release_details for a specific edition's tracklist and barcode.
+    Args:
+        release_group_id: The MBID
+        releases_limit: Max number of releases to show (default 25)
+    """
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
         includes=["artists", "releases", "tags", "ratings", "url-rels"],
@@ -544,8 +617,14 @@ def get_release_group_details(release_group_id: str) -> str:
         f"Genres: {genres or 'None listed'}",
         f"MBID: {release_group_id}",
         f"\nReleases in this group ({len(releases)}):",
-        *releases[:25],
+        *releases[:releases_limit],
     ]
+    if len(releases) > releases_limit:
+        parts.append(
+            f"  ... and {len(releases) - releases_limit} more."
+            f" Use browse_entities(entity_type='releases', linked_type='release_group',"
+            f" linked_id='{release_group_id}') for the full list."
+        )
     return "\n".join(parts)
 
 
@@ -605,14 +684,18 @@ def get_work_details(work_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_area_details(area_id: str) -> str:
-    """Get details about a geographic area (country, city)."""
+def get_area_details(area_id: str, alias_limit: int = 10) -> str:
+    """Get details about a geographic area (country, city).
+    Args:
+        area_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_area_by_id(
         area_id,
         includes=["aliases", "url-rels"],
     )
     a = res["area"]
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
@@ -637,14 +720,18 @@ def _extract_aliases_and_tags(entity_dict: dict, alias_limit: int = 10) -> tuple
 
 @mcp.tool()
 @cached_tool()
-def get_event_details(event_id: str) -> str:
-    """Get details about a music event (concert, festival, etc.)."""
+def get_event_details(event_id: str, alias_limit: int = 10) -> str:
+    """Get details about a music event (concert, festival, etc.).
+    Args:
+        event_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_event_by_id(
         event_id,
         includes=["aliases", "tags", "url-rels"],
     )
     ev = res["event"]
-    aliases, genres = _extract_aliases_and_tags(ev)
+    aliases, genres = _extract_aliases_and_tags(ev, alias_limit)
     lifespan = ev.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "?")
@@ -663,14 +750,18 @@ def get_event_details(event_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_instrument_details(instrument_id: str) -> str:
-    """Get details about a musical instrument."""
+def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
+    """Get details about a musical instrument.
+    Args:
+        instrument_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_instrument_by_id(
         instrument_id,
         includes=["aliases", "tags", "url-rels"],
     )
     inst = res["instrument"]
-    aliases, genres = _extract_aliases_and_tags(inst)
+    aliases, genres = _extract_aliases_and_tags(inst, alias_limit)
 
     parts = [
         f"Name: {inst['name']}",
@@ -685,14 +776,18 @@ def get_instrument_details(instrument_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_place_details(place_id: str) -> str:
-    """Get details about a place (venue, studio, etc.)."""
+def get_place_details(place_id: str, alias_limit: int = 10) -> str:
+    """Get details about a place (venue, studio, etc.).
+    Args:
+        place_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_place_by_id(
         place_id,
         includes=["aliases", "tags", "url-rels"],
     )
     pl = res["place"]
-    aliases, genres = _extract_aliases_and_tags(pl)
+    aliases, genres = _extract_aliases_and_tags(pl, alias_limit)
     coords = pl.get("coordinates", {})
     lat = coords.get("latitude", "N/A")
     lon = coords.get("longitude", "N/A")
@@ -712,14 +807,18 @@ def get_place_details(place_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_series_details(series_id: str) -> str:
-    """Get details about a series (release series, tour, etc.)."""
+def get_series_details(series_id: str, alias_limit: int = 10) -> str:
+    """Get details about a series (release series, tour, etc.).
+    Args:
+        series_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_series_by_id(
         series_id,
         includes=["aliases", "tags", "url-rels"],
     )
     sr = res["series"]
-    aliases, genres = _extract_aliases_and_tags(sr)
+    aliases, genres = _extract_aliases_and_tags(sr, alias_limit)
     parts = [
         f"Name: {sr['name']}",
         f"Type: {sr.get('type', 'N/A')}",
@@ -732,8 +831,12 @@ def get_series_details(series_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_label_details(label_id: str) -> str:
-    """Get details about a record label including type, area, genres, and URLs."""
+def get_label_details(label_id: str, alias_limit: int = 10) -> str:
+    """Get details about a record label including type, area, genres, and URLs.
+    Args:
+        label_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_label_by_id(
         label_id,
         includes=["aliases", "tags", "ratings", "url-rels"],
@@ -741,7 +844,7 @@ def get_label_details(label_id: str) -> str:
     lb = res["label"]
     tags = [t["name"] for t in lb.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
-    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
@@ -912,7 +1015,8 @@ def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
     Typo-tolerant fuzzy search. Tries an exact search first, then falls back to
     fuzzy matching if no results are found.
-    Supports 'artist', 'release', 'recording', 'label', and 'work'.
+    Supports all entity types from search_entities (artist, release, recording,
+    label, work, release-group, area, event, instrument, place, series).
     Use when the query may contain misspellings (e.g., 'Bjork' -> 'Björk').
     """
     # Try exact search first
