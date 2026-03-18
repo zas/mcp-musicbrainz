@@ -75,6 +75,7 @@ def test_search_artists_mock():
         assert "Artist 1 (D1) | artist ID: id1" in res
         assert "Artist 2 | artist ID: id2" in res
 
+
 def test_get_release_group_cover_art_success():
     mock_result = {
         "images": [
@@ -95,7 +96,7 @@ def test_get_release_group_cover_art_success():
         mock.patch("mcp_musicbrainz.server.cache", MockCache()),
     ):
         from mcp_musicbrainz.server import get_release_group_cover_art
-        
+
         res = get_release_group_cover_art("test-rg-id")
         assert "Cover art for release group test-rg-id (1 images):" in res
         assert "[Front] http://example.com/front.jpg" in res
@@ -114,10 +115,44 @@ def test_get_release_group_cover_art_404():
     mock_error = musicbrainzngs.ResponseError(cause=MockCause())
 
     with (
-        mock.patch("musicbrainzngs.get_release_group_image_list", side_effect=mock_error),
+        mock.patch(
+            "musicbrainzngs.get_release_group_image_list",
+            side_effect=mock_error,
+        ),
         mock.patch("mcp_musicbrainz.server.cache", MockCache()),
     ):
         from mcp_musicbrainz.server import get_release_group_cover_art
-        
+
         res = get_release_group_cover_art("test-rg-id")
-        assert "No cover art available for release group test-rg-id in the archive." in res
+        expected_msg = "No cover art available for release group test-rg-id in the archive."
+        assert expected_msg in res
+
+
+def test_missing_entity_details():
+    class MockCache(dict):
+        def set(self, key, value, expire=None):
+            self[key] = value
+
+    mock_event = {"event": {"name": "Test Event", "type": "Festival", "id": "e1"}}
+    mock_instrument = {"instrument": {"name": "Test Instrument", "type": "String", "id": "i1"}}
+    mock_place = {"place": {"name": "Test Place", "type": "Venue", "id": "p1"}}
+    mock_series = {"series": {"name": "Test Series", "type": "Tour", "id": "s1"}}
+
+    with (
+        mock.patch("musicbrainzngs.get_event_by_id", return_value=mock_event),
+        mock.patch("musicbrainzngs.get_instrument_by_id", return_value=mock_instrument),
+        mock.patch("musicbrainzngs.get_place_by_id", return_value=mock_place),
+        mock.patch("musicbrainzngs.get_series_by_id", return_value=mock_series),
+        mock.patch("mcp_musicbrainz.server.cache", MockCache()),
+    ):
+        from mcp_musicbrainz.server import (
+            get_event_details,
+            get_instrument_details,
+            get_place_details,
+            get_series_details,
+        )
+
+        assert "Name: Test Event" in get_event_details("e1")
+        assert "Type: String" in get_instrument_details("i1")
+        assert "Name: Test Place" in get_place_details("p1")
+        assert "Name: Test Series" in get_series_details("s1")
