@@ -951,7 +951,8 @@ def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
     Typo-tolerant fuzzy search. Tries an exact search first, then falls back to
     fuzzy matching if no results are found.
-    Supports 'artist', 'release', 'recording', 'label', and 'work'.
+    Supports all entity types from search_entities (artist, release, recording,
+    label, work, release-group, area, event, instrument, place, series).
     Use when the query may contain misspellings (e.g., 'Bjork' -> 'Björk').
     """
     # Try exact search first
