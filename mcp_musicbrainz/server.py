@@ -328,6 +328,47 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
+def search_release_groups(
+    title: str | None = None,
+    artist: str | None = None,
+    release_group_type: str | None = None,
+    limit: int = 5,
+) -> str:
+    """
+    Search for release groups (albums/EPs/singles) with specific filters.
+    Prefer search_entities for simple title searches; use this when filtering
+    by artist or type.
+    Args:
+        title: Release group title
+        artist: Artist name
+        release_group_type: 'album', 'ep', 'single', 'broadcast', 'other'
+        limit: Max results (default 5)
+    """
+    kwargs = {"limit": limit}
+    if title:
+        kwargs["releasegroup"] = title
+    if artist:
+        kwargs["artist"] = artist
+    if release_group_type:
+        kwargs["type"] = release_group_type
+
+    if not any((title, artist, release_group_type)):
+        return "Please provide at least one search parameter."
+
+    result = musicbrainzngs.search_release_groups(**kwargs)
+    items = result.get("release-group-list", [])
+    lines = [f"Found {len(items)} release groups:"]
+    for i in items:
+        rgtitle = i.get("title")
+        rgartist = i.get("artist-credit-phrase", "Unknown")
+        rgtype = i.get("type", "?")
+        date = i.get("first-release-date", "?")
+        lines.append(f"- {rgtitle} by {rgartist} ({date}) [{rgtype}] | release-group ID: {i['id']}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
 def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
