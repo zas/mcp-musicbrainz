@@ -555,7 +555,11 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
         *releases[:releases_limit],
     ]
     if len(releases) > releases_limit:
-        parts.append(f"  ... and {len(releases) - releases_limit} more. Use browse_entities(entity_type='releases', linked_type='recording', linked_id='{recording_id}') for the full list.")
+        parts.append(
+            f"  ... and {len(releases) - releases_limit} more."
+            f" Use browse_entities(entity_type='releases', linked_type='recording',"
+            f" linked_id='{recording_id}') for the full list."
+        )
     return "\n".join(parts)
 
 
@@ -616,7 +620,11 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
         *releases[:releases_limit],
     ]
     if len(releases) > releases_limit:
-        parts.append(f"  ... and {len(releases) - releases_limit} more. Use browse_entities(entity_type='releases', linked_type='release_group', linked_id='{release_group_id}') for the full list.")
+        parts.append(
+            f"  ... and {len(releases) - releases_limit} more."
+            f" Use browse_entities(entity_type='releases', linked_type='release_group',"
+            f" linked_id='{release_group_id}') for the full list."
+        )
     return "\n".join(parts)
 
 

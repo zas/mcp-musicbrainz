@@ -1,7 +1,5 @@
 """Tests for the cached_tool decorator."""
 
-import unittest.mock as mock
-
 import musicbrainzngs
 
 from mcp_musicbrainz.server import cached_tool

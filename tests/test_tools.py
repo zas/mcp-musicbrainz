@@ -7,8 +7,32 @@ See conftest.py for fixtures and response constants.
 import unittest.mock as mock
 
 import musicbrainzngs
-import pytest
 
+from mcp_musicbrainz.server import (
+    browse_entities,
+    get_album_tracks,
+    get_area_details,
+    get_artist_details,
+    get_artist_discography,
+    get_cover_art_urls,
+    get_entity_relationships,
+    get_event_details,
+    get_instrument_details,
+    get_label_details,
+    get_place_details,
+    get_recording_details,
+    get_release_details,
+    get_release_group_cover_art,
+    get_release_group_details,
+    get_series_details,
+    get_work_details,
+    lookup_by_barcode,
+    search_artists,
+    search_entities,
+    search_entities_fuzzy,
+    search_release_groups,
+    search_releases,
+)
 from tests.conftest import (
     BARCODE_LOOKUP_RESPONSE,
     BROWSE_RELEASE_GROUPS_RESPONSE,
@@ -39,39 +63,15 @@ from tests.conftest import (
     SEARCH_RELEASES_RESPONSE,
     SINISTER_LABEL_ID,
 )
-from mcp_musicbrainz.server import (
-    browse_entities,
-    get_album_tracks,
-    get_area_details,
-    get_artist_details,
-    get_artist_discography,
-    get_cover_art_urls,
-    get_entity_relationships,
-    get_event_details,
-    get_instrument_details,
-    get_label_details,
-    get_place_details,
-    get_recording_details,
-    get_release_details,
-    get_release_group_cover_art,
-    get_release_group_details,
-    get_series_details,
-    get_work_details,
-    lookup_by_barcode,
-    search_artists,
-    search_entities,
-    search_entities_fuzzy,
-    search_release_groups,
-    search_releases,
-)
-
 
 # ── search_entities ──────────────────────────────────────────────────────────
 
 
 class TestSearchEntities:
     def test_artist_search(self):
-        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value=SEARCH_ARTISTS_RESPONSE)}):
+        with mock.patch.dict(
+            "mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value=SEARCH_ARTISTS_RESPONSE)}
+        ):
             res = search_entities("artist", "Reverend Bizarre", limit=2)
         assert "Found 2 results" in res
         assert "Reverend Bizarre (Finnish doom metal band)" in res
@@ -82,7 +82,9 @@ class TestSearchEntities:
         assert "Invalid entity type" in res
 
     def test_empty_results(self):
-        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value={"artist-list": []})}):
+        with mock.patch.dict(
+            "mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value={"artist-list": []})}
+        ):
             res = search_entities("artist", "nonexistent")
         assert "Found 0 results" in res
 
@@ -92,7 +94,9 @@ class TestSearchEntities:
 
 class TestSearchEntitiesFuzzy:
     def test_exact_match_found(self):
-        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value=SEARCH_ARTISTS_RESPONSE)}):
+        with mock.patch.dict(
+            "mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value=SEARCH_ARTISTS_RESPONSE)}
+        ):
             res = search_entities_fuzzy("artist", "Reverend Bizarre")
         assert "Found 2 results" in res
 
@@ -302,17 +306,21 @@ class TestGetRecordingDetails:
 
 class TestGetAlbumTracks:
     def test_tracklist(self):
-        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE):
-            with mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE):
-                res = get_album_tracks(RECTORY_RG_ID)
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE),
+        ):
+            res = get_album_tracks(RECTORY_RG_ID)
         assert "Burn in Hell!" in res
         assert "Cirith Ungol" in res
         assert f"release ID: {RECTORY_RELEASE_ID}" in res
 
     def test_multi_release_hint(self):
-        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE):
-            with mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE):
-                res = get_album_tracks(RECTORY_RG_ID)
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE),
+        ):
+            res = get_album_tracks(RECTORY_RG_ID)
         assert "2 releases available" in res
         assert "get_release_group_details" in res
 
@@ -322,9 +330,11 @@ class TestGetAlbumTracks:
                 "release-list": [{"id": RECTORY_RELEASE_ID, "title": "Test"}],
             }
         }
-        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=single_rg):
-            with mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE):
-                res = get_album_tracks(RECTORY_RG_ID)
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=single_rg),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE),
+        ):
+            res = get_album_tracks(RECTORY_RG_ID)
         assert "releases available" not in res
 
     def test_no_releases(self):
