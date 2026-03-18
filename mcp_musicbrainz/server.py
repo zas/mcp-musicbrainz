@@ -130,6 +130,11 @@ def _fmt_duration(ms: str | int | None) -> str:
     return f"{minutes}:{seconds:02d}"
 
 
+def _fmt_rating(entity: dict[str, Any]) -> str:
+    rating = entity.get("rating", {})
+    return f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)" if rating.get("rating") else "N/A"
+
+
 def _mb_error_message(err: musicbrainzngs.MusicBrainzError) -> str:
     """Extract a readable message from a MusicBrainz error."""
     if isinstance(err, musicbrainzngs.ResponseError):
@@ -417,8 +422,7 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
-    rating = a.get("rating", {})
-    rating_str = f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)" if rating.get("rating") else "N/A"
+    rating_str = _fmt_rating(a)
 
     parts = [
         f"Name: {a['name']}",
@@ -544,12 +548,15 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     artist = rec.get("artist-credit-phrase", "N/A")
     dur = _fmt_duration(rec.get("length"))
 
+    rating_str = _fmt_rating(rec)
+
     parts = [
         f"Title: {rec['title']}",
         f"Artist: {artist}",
         f"Duration: {dur}",
         f"ISRCs: {isrcs}",
         f"Genres: {genres or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {recording_id}",
         f"\nAppears on ({len(releases)} releases):",
         *releases[:releases_limit],
@@ -609,12 +616,15 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
 
     releases = [f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}" for r in rg.get("release-list", [])]
 
+    rating_str = _fmt_rating(rg)
+
     parts = [
         f"Title: {rg['title']}",
         f"Artist: {artist}",
         f"Type: {rtype}",
         f"First Release Date: {date}",
         f"Genres: {genres or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {release_group_id}",
         f"\nReleases in this group ({len(releases)}):",
         *releases[:releases_limit],
@@ -665,10 +675,13 @@ def get_work_details(work_id: str) -> str:
             f"  - {rtype.capitalize()}{attrs_str} ({direction}): {target['title']}{lang_str} | work ID: {target['id']}"
         )
 
+    rating_str = _fmt_rating(w)
+
     parts = [
         f"Title: {w['title']}",
         f"Type: {w.get('type', 'Unknown')}",
         f"Genres: {genres or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {work_id}",
         "\nCreators:",
         *(creators or ["  - No creators listed"]),
@@ -850,6 +863,8 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
 
+    rating_str = _fmt_rating(lb)
+
     parts = [
         f"Name: {lb['name']}",
         f"Type: {lb.get('type', 'N/A')}",
@@ -857,6 +872,7 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
         f"Founded: {begin} to {end}",
         f"Label code: {lb.get('label-code', 'N/A')}",
         f"Genres: {genres or 'None listed'}",
+        f"Rating: {rating_str}",
         f"Aliases: {aliases or 'None'}",
         f"MBID: {lb['id']}",
     ]

@@ -278,6 +278,7 @@ GET_RECORDING_RESPONSE = {
             {"count": "2", "name": "doom metal"},
             {"count": "1", "name": "finnish metal"},
         ],
+        "rating": {"votes-count": "2", "rating": "4.25"},
     }
 }
 
@@ -311,6 +312,7 @@ GET_WORK_RESPONSE = {
             {"count": "1", "name": "heavy metal"},
             {"count": "1", "name": "rock"},
         ],
+        "rating": {"votes-count": "1", "rating": "4.5"},
     }
 }
 
@@ -342,6 +344,7 @@ GET_LABEL_RESPONSE = {
         "url-relation-list": [
             {"type": "discogs", "target": "https://www.discogs.com/label/60339", "direction": "forward"},
         ],
+        "rating": {"votes-count": "5", "rating": "3.8"},
     }
 }
 

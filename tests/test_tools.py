@@ -286,6 +286,7 @@ class TestGetRecordingDetails:
         assert "Duration: 8:52" in res
         assert "FISFS0404002" in res
         assert "doom metal" in res
+        assert "Rating: 4.25/5 (2 votes)" in res
         assert "Appears on (3 releases)" in res
 
     def test_releases_limit(self):
@@ -355,6 +356,7 @@ class TestGetReleaseGroupDetails:
         assert "Artist: Reverend Bizarre" in res
         assert "Type: Album" in res
         assert "doom metal" in res
+        assert "Rating: 4.25/5 (2 votes)" in res
         assert "Releases in this group (2)" in res
 
     def test_releases_limit(self):
@@ -376,6 +378,7 @@ class TestGetWorkDetails:
         assert "Composer: Dee Snider" in res
         assert "Lyricist: Dee Snider" in res
         assert "heavy metal" in res
+        assert "Rating: 4.5/5 (1 votes)" in res
 
     def test_publishers(self):
         with mock.patch("musicbrainzngs.get_work_by_id", return_value=GET_WORK_RESPONSE):
@@ -471,6 +474,7 @@ class TestGetLabelDetails:
         assert "Name: Sinister Figure" in res
         assert "Type: Original Production" in res
         assert "Country: FI" in res
+        assert "Rating: 3.8/5 (5 votes)" in res
         assert "discogs" in res
 
 
