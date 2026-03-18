@@ -28,6 +28,7 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_place_details` | Place info (venue, studio) with address, coordinates, aliases, and tags |
 | `get_series_details` | Series info (release series, tour) with type, aliases, and tags |
 | `get_release_group_cover_art` | Cover art image URLs for a release group (album concept) |
+
 ## Setup
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
