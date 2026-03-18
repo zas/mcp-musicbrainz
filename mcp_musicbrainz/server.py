@@ -328,7 +328,7 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
-def get_artist_details(artist_id: str) -> str:
+def get_artist_details(artist_id: str, alias_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
     and their discography (Release Groups) with MBIDs.
@@ -347,7 +347,7 @@ def get_artist_details(artist_id: str) -> str:
     a = res["artist"]
     tags = [t["name"] for t in a.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
     rg_list = sorted(
@@ -605,14 +605,14 @@ def get_work_details(work_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_area_details(area_id: str) -> str:
+def get_area_details(area_id: str, alias_limit: int = 10) -> str:
     """Get details about a geographic area (country, city)."""
     res = musicbrainzngs.get_area_by_id(
         area_id,
         includes=["aliases", "url-rels"],
     )
     a = res["area"]
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
@@ -637,14 +637,14 @@ def _extract_aliases_and_tags(entity_dict: dict, alias_limit: int = 10) -> tuple
 
 @mcp.tool()
 @cached_tool()
-def get_event_details(event_id: str) -> str:
+def get_event_details(event_id: str, alias_limit: int = 10) -> str:
     """Get details about a music event (concert, festival, etc.)."""
     res = musicbrainzngs.get_event_by_id(
         event_id,
         includes=["aliases", "tags", "url-rels"],
     )
     ev = res["event"]
-    aliases, genres = _extract_aliases_and_tags(ev)
+    aliases, genres = _extract_aliases_and_tags(ev, alias_limit)
     lifespan = ev.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "?")
@@ -663,14 +663,14 @@ def get_event_details(event_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_instrument_details(instrument_id: str) -> str:
+def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
     """Get details about a musical instrument."""
     res = musicbrainzngs.get_instrument_by_id(
         instrument_id,
         includes=["aliases", "tags", "url-rels"],
     )
     inst = res["instrument"]
-    aliases, genres = _extract_aliases_and_tags(inst)
+    aliases, genres = _extract_aliases_and_tags(inst, alias_limit)
 
     parts = [
         f"Name: {inst['name']}",
@@ -685,14 +685,14 @@ def get_instrument_details(instrument_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_place_details(place_id: str) -> str:
+def get_place_details(place_id: str, alias_limit: int = 10) -> str:
     """Get details about a place (venue, studio, etc.)."""
     res = musicbrainzngs.get_place_by_id(
         place_id,
         includes=["aliases", "tags", "url-rels"],
     )
     pl = res["place"]
-    aliases, genres = _extract_aliases_and_tags(pl)
+    aliases, genres = _extract_aliases_and_tags(pl, alias_limit)
     coords = pl.get("coordinates", {})
     lat = coords.get("latitude", "N/A")
     lon = coords.get("longitude", "N/A")
@@ -712,14 +712,14 @@ def get_place_details(place_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_series_details(series_id: str) -> str:
+def get_series_details(series_id: str, alias_limit: int = 10) -> str:
     """Get details about a series (release series, tour, etc.)."""
     res = musicbrainzngs.get_series_by_id(
         series_id,
         includes=["aliases", "tags", "url-rels"],
     )
     sr = res["series"]
-    aliases, genres = _extract_aliases_and_tags(sr)
+    aliases, genres = _extract_aliases_and_tags(sr, alias_limit)
     parts = [
         f"Name: {sr['name']}",
         f"Type: {sr.get('type', 'N/A')}",
@@ -732,7 +732,7 @@ def get_series_details(series_id: str) -> str:
 
 @mcp.tool()
 @cached_tool()
-def get_label_details(label_id: str) -> str:
+def get_label_details(label_id: str, alias_limit: int = 10) -> str:
     """Get details about a record label including type, area, genres, and URLs."""
     res = musicbrainzngs.get_label_by_id(
         label_id,
@@ -741,7 +741,7 @@ def get_label_details(label_id: str) -> str:
     lb = res["label"]
     tags = [t["name"] for t in lb.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
-    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:10])
+    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
