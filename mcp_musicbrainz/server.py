@@ -572,8 +572,14 @@ def get_album_tracks(release_group_id: str) -> str:
 
     release_id = releases[0]["id"]
     release_details = musicbrainzngs.get_release_by_id(release_id, includes=["recordings"])
-    tracks = _format_tracks(release_details["release"].get("medium-list", []))
-    return "\n".join(tracks) if tracks else "No tracks found."
+    r = release_details["release"]
+    tracks = _format_tracks(r.get("medium-list", []))
+    if not tracks:
+        return "No tracks found."
+    header = f"Tracklist from release: {r.get('title', '?')} ({r.get('date', '?')}) | release ID: {release_id}"
+    if len(releases) > 1:
+        header += f"\n({len(releases)} releases available; use get_release_group_details to see all editions)"
+    return header + "\n" + "\n".join(tracks)
 
 
 @mcp.tool()
