@@ -18,6 +18,7 @@ Rules for AI agents working on this project.
 - Line length limit: 120 characters
 - Use `from __future__ import annotations` (already present)
 - Type hints on all function signatures
+- Use `uv run` to run all commands — never invoke `python`, `pytest`, `ruff` etc. directly
 
 ## Testing
 
@@ -27,6 +28,10 @@ Rules for AI agents working on this project.
 - Other `musicbrainzngs` functions (e.g. `get_artist_by_id`) can be mocked directly
 - `conftest.py` provides an autouse `_mock_cache` fixture replacing the disk cache
 - Run tests: `uv run pytest tests/ -v`
+- Helper functions (e.g. `_fmt_rating`, `_fmt_tags`) are unit-tested in `tests/test_server.py`
+- Tool functions are integration-tested in `tests/test_tools.py` with mock API responses
+- When adding a field to tool output, add it to the mock data in `conftest.py` and assert it in the corresponding `test_full_output` test
+- Verify `musicbrainzngs` function signatures (use `uv run python -c "import inspect, musicbrainzngs; print(inspect.signature(musicbrainzngs.<func>))"`) — parameter names vary between functions (e.g. `includes` not `release_group_includes`)
 
 ## Adding a New Tool
 
