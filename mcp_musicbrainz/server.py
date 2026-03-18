@@ -13,6 +13,10 @@ from mcp_musicbrainz import __version__
 mcp = FastMCP("MusicBrainz")
 cache = diskcache.Cache(".musicbrainz_cache")
 
+# Bump this when changing how API responses are fetched or formatted,
+# so stale cached results are automatically bypassed.
+CACHE_VERSION = 2
+
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
     __version__,
@@ -29,7 +33,7 @@ def cached_tool(expire: int = 86400) -> Callable:
             # Create a cache key from function name and arguments
             arg_str = ":".join(map(str, args))
             kwarg_str = ":".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"{func.__name__}:{arg_str}:{kwarg_str}"
+            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"
 
             if cache_key in cache:
                 return cache[cache_key]
@@ -575,7 +579,7 @@ def get_work_details(work_id: str) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
     res = musicbrainzngs.get_work_by_id(
         work_id,
-        includes=["artist-rels", "work-rels", "tags", "ratings"],
+        includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings"],
     )
     w = res["work"]
     tags = [t["name"] for t in w.get("tag-list", [])]
@@ -587,16 +591,24 @@ def get_work_details(work_id: str) -> str:
         artist = rel["artist"]["name"]
         creators.append(f"  - {rtype.capitalize()}: {artist}")
 
+    publishers = []
+    for rel in w.get("label-relation-list", []):
+        rtype = rel["type"]
+        label = rel["label"]["name"]
+        publishers.append(f"  - {rtype.capitalize()}: {label}")
+
     related_works = []
     for rel in w.get("work-relation-list", []):
         rtype = rel["type"]
         direction = rel.get("direction", "")
+        attrs = rel.get("attribute-list", [])
         target = rel["work"]
         lang = target.get("language", "")
         lang_str = f" [{lang}]" if lang else ""
+        attrs_str = f" ({', '.join(attrs)})" if attrs else ""
         related_works.append(
-            f"  - {rtype.capitalize()} ({direction}): {target['title']}{lang_str} "
-            f"| work ID: {target['id']}"
+            f"  - {rtype.capitalize()}{attrs_str} ({direction}): "
+            f"{target['title']}{lang_str} | work ID: {target['id']}"
         )
 
     parts = [
@@ -607,6 +619,9 @@ def get_work_details(work_id: str) -> str:
         "\nCreators:",
         *(creators or ["  - No creators listed"]),
     ]
+    if publishers:
+        parts.append("\nPublishers:")
+        parts.extend(publishers)
     if related_works:
         parts.append("\nRelated works:")
         parts.extend(related_works)
@@ -813,7 +828,7 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
         ),
         "work": (
             musicbrainzngs.get_work_by_id,
-            ["artist-rels", "work-rels", "url-rels"],
+            ["artist-rels", "label-rels", "work-rels", "url-rels"],
         ),
         "label": (musicbrainzngs.get_label_by_id, ["artist-rels", "url-rels"]),
         "area": (musicbrainzngs.get_area_by_id, ["area-rels", "url-rels"]),
@@ -843,6 +858,7 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
         if key.endswith("-relation-list") and isinstance(value, list):
             for rel in value:
                 rtype = rel.get("type", "Unknown")
+                attrs = rel.get("attribute-list", [])
                 target = (
                     rel.get("artist", {}).get("name")
                     or rel.get("work", {}).get("title")
@@ -850,7 +866,8 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
                     or rel.get("label", {}).get("name")
                     or rel.get("target", "Unknown")
                 )
-                lines.append(f"  - {rtype.capitalize()}: {target}")
+                attrs_str = f" ({', '.join(attrs)})" if attrs else ""
+                lines.append(f"  - {rtype.capitalize()}{attrs_str}: {target}")
                 found = True
 
     if not found:
