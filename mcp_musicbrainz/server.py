@@ -130,6 +130,16 @@ def _fmt_duration(ms: str | int | None) -> str:
     return f"{minutes}:{seconds:02d}"
 
 
+def _fmt_rating(entity: dict[str, Any]) -> str:
+    rating = entity.get("rating", {})
+    return f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)" if rating.get("rating") else "N/A"
+
+
+def _fmt_tags(entity: dict[str, Any]) -> str:
+    tags = sorted(entity.get("tag-list", []), key=lambda t: int(t.get("count", 0)), reverse=True)
+    return ", ".join(f"{t['name']} ({t['count']})" for t in tags) if tags else ""
+
+
 def _mb_error_message(err: musicbrainzngs.MusicBrainzError) -> str:
     """Extract a readable message from a MusicBrainz error."""
     if isinstance(err, musicbrainzngs.ResponseError):
@@ -380,7 +390,7 @@ def search_release_groups(
 @cached_tool()
 def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
-    Get comprehensive info about an artist including aliases, tags, genres,
+    Get comprehensive info about an artist including aliases, tags,
     and their discography (Release Groups) with MBIDs.
     Shows first release groups; use get_artist_discography for the full paged list.
     Args:
@@ -399,8 +409,7 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
         ],
     )
     a = res["artist"]
-    tags = [t["name"] for t in a.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    tags = _fmt_tags(a)
     aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
@@ -417,15 +426,14 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
-    rating = a.get("rating", {})
-    rating_str = f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)" if rating.get("rating") else "N/A"
+    rating_str = _fmt_rating(a)
 
     parts = [
         f"Name: {a['name']}",
         f"Type: {a.get('type', 'N/A')}",
         f"Country: {a.get('country', 'N/A')}",
         f"Life-span: {begin} to {end}",
-        f"Genres: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"Aliases: {aliases or 'None'}",
         f"MBID: {a['id']}",
@@ -458,7 +466,7 @@ def get_artist_discography(
         artist=artist_id,
         limit=min(limit, 100),
         offset=offset,
-        release_group_includes=["releases"],
+        includes=["releases"],
     )
     items = res.get("release-group-list", [])
     count = res.get("release-group-count", len(items))
@@ -518,7 +526,7 @@ def get_release_details(release_id: str) -> str:
 @cached_tool()
 def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     """
-    Get recording details: artist, duration, ISRCs, genres, and which
+    Get recording details: artist, duration, ISRCs, tags, and which
     releases (albums/singles) it appears on.
     Args:
         recording_id: The MBID
@@ -539,17 +547,19 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
         f"  - {rel['title']} ({rel.get('date', '?')}) | release ID: {rel['id']}" for rel in rec.get("release-list", [])
     ]
     isrcs = ", ".join(rec.get("isrc-list", [])) or "None"
-    tags = [t["name"] for t in rec.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    tags = _fmt_tags(rec)
     artist = rec.get("artist-credit-phrase", "N/A")
     dur = _fmt_duration(rec.get("length"))
+
+    rating_str = _fmt_rating(rec)
 
     parts = [
         f"Title: {rec['title']}",
         f"Artist: {artist}",
         f"Duration: {dur}",
         f"ISRCs: {isrcs}",
-        f"Genres: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {recording_id}",
         f"\nAppears on ({len(releases)} releases):",
         *releases[:releases_limit],
@@ -601,20 +611,22 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
         includes=["artists", "releases", "tags", "ratings", "url-rels"],
     )
     rg = res["release-group"]
-    tags = [t["name"] for t in rg.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    tags = _fmt_tags(rg)
     artist = rg.get("artist-credit-phrase", "Unknown")
     rtype = rg.get("type", "Unknown")
     date = rg.get("first-release-date", "Unknown")
 
     releases = [f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}" for r in rg.get("release-list", [])]
 
+    rating_str = _fmt_rating(rg)
+
     parts = [
         f"Title: {rg['title']}",
         f"Artist: {artist}",
         f"Type: {rtype}",
         f"First Release Date: {date}",
-        f"Genres: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {release_group_id}",
         f"\nReleases in this group ({len(releases)}):",
         *releases[:releases_limit],
@@ -637,8 +649,7 @@ def get_work_details(work_id: str) -> str:
         includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings"],
     )
     w = res["work"]
-    tags = [t["name"] for t in w.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    tags = _fmt_tags(w)
 
     creators = []
     for rel in w.get("artist-relation-list", []):
@@ -665,10 +676,13 @@ def get_work_details(work_id: str) -> str:
             f"  - {rtype.capitalize()}{attrs_str} ({direction}): {target['title']}{lang_str} | work ID: {target['id']}"
         )
 
+    rating_str = _fmt_rating(w)
+
     parts = [
         f"Title: {w['title']}",
         f"Type: {w.get('type', 'Unknown')}",
-        f"Genres: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
+        f"Rating: {rating_str}",
         f"MBID: {work_id}",
         "\nCreators:",
         *(creators or ["  - No creators listed"]),
@@ -710,12 +724,11 @@ def get_area_details(area_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-def _extract_aliases_and_tags(entity_dict: dict, alias_limit: int = 10) -> tuple[str, str]:
-    """Helper to extract formatted aliases and genres/tags from an entity dictionary."""
+def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10) -> tuple[str, str]:
+    """Helper to extract formatted aliases and tags from an entity dictionary."""
     aliases = ", ".join(al["alias"] for al in entity_dict.get("alias-list", [])[:alias_limit])
-    tags = [t["name"] for t in entity_dict.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
-    return aliases, genres
+    tags = _fmt_tags(entity_dict)
+    return aliases, tags
 
 
 @mcp.tool()
@@ -731,7 +744,7 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     ev = res["event"]
-    aliases, genres = _extract_aliases_and_tags(ev, alias_limit)
+    aliases, tags = _extract_aliases_and_tags(ev, alias_limit)
     lifespan = ev.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "?")
@@ -742,7 +755,7 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
         f"Date: {begin} to {end}",
         f"Time: {ev.get('time', 'N/A')}",
         f"Aliases: {aliases or 'None'}",
-        f"Tags: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
         f"MBID: {event_id}",
     ]
     return "\n".join(parts)
@@ -761,14 +774,14 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     inst = res["instrument"]
-    aliases, genres = _extract_aliases_and_tags(inst, alias_limit)
+    aliases, tags = _extract_aliases_and_tags(inst, alias_limit)
 
     parts = [
         f"Name: {inst['name']}",
         f"Type: {inst.get('type', 'N/A')}",
         f"Description: {inst.get('description', 'N/A')}",
         f"Aliases: {aliases or 'None'}",
-        f"Tags: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
         f"MBID: {instrument_id}",
     ]
     return "\n".join(parts)
@@ -787,7 +800,7 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     pl = res["place"]
-    aliases, genres = _extract_aliases_and_tags(pl, alias_limit)
+    aliases, tags = _extract_aliases_and_tags(pl, alias_limit)
     coords = pl.get("coordinates", {})
     lat = coords.get("latitude", "N/A")
     lon = coords.get("longitude", "N/A")
@@ -799,7 +812,7 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
         f"Address: {address}",
         f"Coordinates: {lat}, {lon}",
         f"Aliases: {aliases or 'None'}",
-        f"Tags: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
         f"MBID: {place_id}",
     ]
     return "\n".join(parts)
@@ -818,12 +831,12 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     sr = res["series"]
-    aliases, genres = _extract_aliases_and_tags(sr, alias_limit)
+    aliases, tags = _extract_aliases_and_tags(sr, alias_limit)
     parts = [
         f"Name: {sr['name']}",
         f"Type: {sr.get('type', 'N/A')}",
         f"Aliases: {aliases or 'None'}",
-        f"Tags: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
         f"MBID: {series_id}",
     ]
     return "\n".join(parts)
@@ -832,7 +845,7 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
 @mcp.tool()
 @cached_tool()
 def get_label_details(label_id: str, alias_limit: int = 10) -> str:
-    """Get details about a record label including type, area, genres, and URLs.
+    """Get details about a record label including type, area, tags, and URLs.
     Args:
         label_id: The MBID
         alias_limit: Max number of aliases to show (default 10)
@@ -842,13 +855,14 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "ratings", "url-rels"],
     )
     lb = res["label"]
-    tags = [t["name"] for t in lb.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    tags = _fmt_tags(lb)
     aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:alias_limit])
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
+
+    rating_str = _fmt_rating(lb)
 
     parts = [
         f"Name: {lb['name']}",
@@ -856,7 +870,8 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
         f"Country: {lb.get('country', 'N/A')}",
         f"Founded: {begin} to {end}",
         f"Label code: {lb.get('label-code', 'N/A')}",
-        f"Genres: {genres or 'None listed'}",
+        f"Tags: {tags or 'None listed'}",
+        f"Rating: {rating_str}",
         f"Aliases: {aliases or 'None'}",
         f"MBID: {lb['id']}",
     ]

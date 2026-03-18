@@ -215,7 +215,7 @@ class TestGetArtistDetails:
         assert "Type: Group" in res
         assert "Country: FI" in res
         assert "Life-span: 1995 to 2007" in res
-        assert "doom metal" in res
+        assert "doom metal (4)" in res
         assert "5/5 (3 votes)" in res
         assert "Reverand Bizarre" in res
         assert "bandcamp" in res
@@ -285,7 +285,8 @@ class TestGetRecordingDetails:
         assert "Artist: Reverend Bizarre" in res
         assert "Duration: 8:52" in res
         assert "FISFS0404002" in res
-        assert "doom metal" in res
+        assert "doom metal (2)" in res
+        assert "Rating: 4.25/5 (2 votes)" in res
         assert "Appears on (3 releases)" in res
 
     def test_releases_limit(self):
@@ -354,7 +355,8 @@ class TestGetReleaseGroupDetails:
         assert "Title: In the Rectory of the Bizarre Reverend" in res
         assert "Artist: Reverend Bizarre" in res
         assert "Type: Album" in res
-        assert "doom metal" in res
+        assert "doom metal (2)" in res
+        assert "Rating: 4.25/5 (2 votes)" in res
         assert "Releases in this group (2)" in res
 
     def test_releases_limit(self):
@@ -375,7 +377,8 @@ class TestGetWorkDetails:
         assert "Type: Song" in res
         assert "Composer: Dee Snider" in res
         assert "Lyricist: Dee Snider" in res
-        assert "heavy metal" in res
+        assert "heavy metal (1)" in res
+        assert "Rating: 4.5/5 (1 votes)" in res
 
     def test_publishers(self):
         with mock.patch("musicbrainzngs.get_work_by_id", return_value=GET_WORK_RESPONSE):
@@ -419,7 +422,7 @@ class TestGetEventDetails:
         assert "Date: 2007-10-26 to 2007-10-26" in res
         assert "Time: 20:00" in res
         assert "RB Last Gig" in res
-        assert "doom metal" in res
+        assert "doom metal (1)" in res
 
 
 # ── get_instrument_details ───────────────────────────────────────────────────
@@ -471,6 +474,7 @@ class TestGetLabelDetails:
         assert "Name: Sinister Figure" in res
         assert "Type: Original Production" in res
         assert "Country: FI" in res
+        assert "Rating: 3.8/5 (5 votes)" in res
         assert "discogs" in res
 
 
