@@ -84,6 +84,14 @@ uv run pytest tests/ -v
 uv run ruff check .
 ```
 
+### Pre-commit hooks
+
+Install [pre-commit](https://pre-commit.com/) hooks to automatically run linting and formatting on commit, and tests on push:
+
+```bash
+uv run pre-commit install
+```
+
 ## Caching
 
 Responses are cached locally in `.musicbrainz_cache/` using [diskcache](https://github.com/grantjenks/python-diskcache) with a 24-hour TTL to respect MusicBrainz rate limits.
