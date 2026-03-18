@@ -332,7 +332,11 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
     """
     Get comprehensive info about an artist including aliases, tags, genres,
     and their discography (Release Groups) with MBIDs.
-    Shows first 10 release groups; use get_artist_discography for the full paged list.
+    Shows first release groups; use get_artist_discography for the full paged list.
+    Args:
+        artist_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+        discography_limit: Max number of release groups to show (default 10)
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -466,6 +470,9 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     """
     Get recording details: artist, duration, ISRCs, genres, and which
     releases (albums/singles) it appears on.
+    Args:
+        recording_id: The MBID
+        releases_limit: Max number of releases to show (default 25)
     """
     res = musicbrainzngs.get_recording_by_id(
         recording_id,
@@ -522,7 +529,11 @@ def get_album_tracks(release_group_id: str) -> str:
 def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
     A release group contains one or more releases (specific editions).
-    Use get_release_details for a specific edition's tracklist and barcode."""
+    Use get_release_details for a specific edition's tracklist and barcode.
+    Args:
+        release_group_id: The MBID
+        releases_limit: Max number of releases to show (default 25)
+    """
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
         includes=["artists", "releases", "tags", "ratings", "url-rels"],
@@ -606,7 +617,11 @@ def get_work_details(work_id: str) -> str:
 @mcp.tool()
 @cached_tool()
 def get_area_details(area_id: str, alias_limit: int = 10) -> str:
-    """Get details about a geographic area (country, city)."""
+    """Get details about a geographic area (country, city).
+    Args:
+        area_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_area_by_id(
         area_id,
         includes=["aliases", "url-rels"],
@@ -638,7 +653,11 @@ def _extract_aliases_and_tags(entity_dict: dict, alias_limit: int = 10) -> tuple
 @mcp.tool()
 @cached_tool()
 def get_event_details(event_id: str, alias_limit: int = 10) -> str:
-    """Get details about a music event (concert, festival, etc.)."""
+    """Get details about a music event (concert, festival, etc.).
+    Args:
+        event_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_event_by_id(
         event_id,
         includes=["aliases", "tags", "url-rels"],
@@ -664,7 +683,11 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
 @mcp.tool()
 @cached_tool()
 def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
-    """Get details about a musical instrument."""
+    """Get details about a musical instrument.
+    Args:
+        instrument_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_instrument_by_id(
         instrument_id,
         includes=["aliases", "tags", "url-rels"],
@@ -686,7 +709,11 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
 @mcp.tool()
 @cached_tool()
 def get_place_details(place_id: str, alias_limit: int = 10) -> str:
-    """Get details about a place (venue, studio, etc.)."""
+    """Get details about a place (venue, studio, etc.).
+    Args:
+        place_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_place_by_id(
         place_id,
         includes=["aliases", "tags", "url-rels"],
@@ -713,7 +740,11 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
 @mcp.tool()
 @cached_tool()
 def get_series_details(series_id: str, alias_limit: int = 10) -> str:
-    """Get details about a series (release series, tour, etc.)."""
+    """Get details about a series (release series, tour, etc.).
+    Args:
+        series_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_series_by_id(
         series_id,
         includes=["aliases", "tags", "url-rels"],
@@ -733,7 +764,11 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
 @mcp.tool()
 @cached_tool()
 def get_label_details(label_id: str, alias_limit: int = 10) -> str:
-    """Get details about a record label including type, area, genres, and URLs."""
+    """Get details about a record label including type, area, genres, and URLs.
+    Args:
+        label_id: The MBID
+        alias_limit: Max number of aliases to show (default 10)
+    """
     res = musicbrainzngs.get_label_by_id(
         label_id,
         includes=["aliases", "tags", "ratings", "url-rels"],
