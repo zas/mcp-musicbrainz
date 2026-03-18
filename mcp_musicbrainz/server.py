@@ -34,13 +34,13 @@ ID_HINT: dict[str, str] = {
 def cached_tool(expire: int = 86400) -> Callable:
     """Decorator to cache tool results and handle MusicBrainz errors."""
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[..., str]) -> Callable[..., str]:
         @functools.wraps(func)
         def wrapper(*args, **kwargs) -> str:
             # Create a cache key from function name and arguments
             arg_str = ":".join(map(str, args))
             kwarg_str = ":".join(f"{k}={v}" for k, v in sorted(kwargs.items()))
-            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"
+            cache_key = f"v{CACHE_VERSION}:{func.__name__}:{arg_str}:{kwarg_str}"  # type: ignore[union-attr]
 
             if cache_key in cache:
                 return cache[cache_key]
@@ -51,7 +51,7 @@ def cached_tool(expire: int = 86400) -> Callable:
                 return result
             except musicbrainzngs.MusicBrainzError as e:
                 msg = _mb_error_message(e)
-                hint = ID_HINT.get(func.__name__, "")
+                hint = ID_HINT.get(func.__name__, "")  # type: ignore[union-attr]
                 return f"{msg} {hint}".strip() if hint else msg
             except Exception as e:
                 return f"An unexpected error occurred: {e}"
@@ -311,7 +311,7 @@ def search_releases(
         barcode: UPC/EAN barcode
         limit: Max results (default 5)
     """
-    kwargs = {"limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit}
     if title:
         kwargs["release"] = title
     if artist:
@@ -353,7 +353,7 @@ def search_release_groups(
         release_group_type: 'album', 'ep', 'single', 'broadcast', 'other'
         limit: Max results (default 5)
     """
-    kwargs = {"limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit}
     if title:
         kwargs["releasegroup"] = title
     if artist:
