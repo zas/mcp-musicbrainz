@@ -14,6 +14,7 @@ Rules for AI agents working on this project.
 
 - Imports at the top of the file, never inline/local imports
 - Run `uv run ruff format .` and `uv run ruff check .` before every commit
+- Run `uv run ty check` before every commit for static type checking
 - Line length limit: 120 characters
 - Use `from __future__ import annotations` (already present)
 - Type hints on all function signatures
