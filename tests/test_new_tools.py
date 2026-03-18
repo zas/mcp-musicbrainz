@@ -75,6 +75,7 @@ def test_search_artists_mock():
         assert "Artist 1 (D1) | artist ID: id1" in res
         assert "Artist 2 | artist ID: id2" in res
 
+
 def test_get_release_group_cover_art_success():
     mock_result = {
         "images": [
@@ -91,14 +92,11 @@ def test_get_release_group_cover_art_success():
             self[key] = value
 
     with (
-        mock.patch(
-            "musicbrainzngs.get_release_group_image_list", 
-            return_value=mock_result
-        ),
+        mock.patch("musicbrainzngs.get_release_group_image_list", return_value=mock_result),
         mock.patch("mcp_musicbrainz.server.cache", MockCache()),
     ):
         from mcp_musicbrainz.server import get_release_group_cover_art
-        
+
         res = get_release_group_cover_art("test-rg-id")
         assert "Cover art for release group test-rg-id (1 images):" in res
         assert "[Front] http://example.com/front.jpg" in res
@@ -124,12 +122,11 @@ def test_get_release_group_cover_art_404():
         mock.patch("mcp_musicbrainz.server.cache", MockCache()),
     ):
         from mcp_musicbrainz.server import get_release_group_cover_art
-        
+
         res = get_release_group_cover_art("test-rg-id")
-        expected_msg = (
-            "No cover art available for release group test-rg-id in the archive."
-        )
+        expected_msg = "No cover art available for release group test-rg-id in the archive."
         assert expected_msg in res
+
 
 def test_missing_entity_details():
     class MockCache(dict):
@@ -137,9 +134,7 @@ def test_missing_entity_details():
             self[key] = value
 
     mock_event = {"event": {"name": "Test Event", "type": "Festival", "id": "e1"}}
-    mock_instrument = {
-        "instrument": {"name": "Test Instrument", "type": "String", "id": "i1"}
-    }
+    mock_instrument = {"instrument": {"name": "Test Instrument", "type": "String", "id": "i1"}}
     mock_place = {"place": {"name": "Test Place", "type": "Venue", "id": "p1"}}
     mock_series = {"series": {"name": "Test Series", "type": "Tour", "id": "s1"}}
 

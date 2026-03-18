@@ -174,10 +174,7 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
     Always track which entity type an ID belongs to and pass it to the matching tool.
     """
     if entity_type not in SEARCH_FUNCS:
-        return (
-            f"Invalid entity type '{entity_type}'. "
-            f"Choose from: {', '.join(SEARCH_FUNCS)}"
-        )
+        return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(SEARCH_FUNCS)}"
     result = SEARCH_FUNCS[entity_type](query=query, limit=limit)
     list_key = f"{entity_type.replace('-', '_')}-list"
     items = result.get(list_key, [])
@@ -219,10 +216,7 @@ def browse_entities(
         offset: Paging offset
     """
     if entity_type not in BROWSE_FUNCS:
-        return (
-            f"Invalid entity type '{entity_type}'. "
-            f"Choose from: {', '.join(BROWSE_FUNCS)}"
-        )
+        return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(BROWSE_FUNCS)}"
     # Normalize hyphenated linked_type to underscore for musicbrainzngs kwargs
     normalized = linked_type.replace("-", "_")
     valid_for_entity = VALID_BROWSE_COMBINATIONS.get(entity_type, set())
@@ -232,9 +226,7 @@ def browse_entities(
             f"Valid linked types: {', '.join(sorted(valid_for_entity))}"
         )
 
-    result = BROWSE_FUNCS[entity_type](
-        **{normalized: linked_id, "limit": min(limit, 100), "offset": offset}
-    )
+    result = BROWSE_FUNCS[entity_type](**{normalized: linked_id, "limit": min(limit, 100), "offset": offset})
     singular = entity_type.rstrip("s")
     list_key = f"{singular}-list"
     count_key = f"{singular}-count"
@@ -356,9 +348,7 @@ def get_artist_details(artist_id: str) -> str:
     tags = [t["name"] for t in a.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
     aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:10])
-    urls = "\n".join(
-        f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", [])
-    )
+    urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
     rg_list = sorted(
         a.get("release-group-list", []),
@@ -368,19 +358,13 @@ def get_artist_details(artist_id: str) -> str:
     for rg in rg_list:
         rtype = rg.get("type", "Unknown")
         date = rg.get("first-release-date", "????")
-        albums.append(
-            f"  - {rg['title']} ({date}) [{rtype}] | release-group ID: {rg['id']}"
-        )
+        albums.append(f"  - {rg['title']} ({date}) [{rtype}] | release-group ID: {rg['id']}")
 
     lifespan = a.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
     rating = a.get("rating", {})
-    rating_str = (
-        f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)"
-        if rating.get("rating")
-        else "N/A"
-    )
+    rating_str = f"{rating['rating']}/5 ({rating.get('votes-count', 0)} votes)" if rating.get("rating") else "N/A"
 
     parts = [
         f"Name: {a['name']}",
@@ -495,8 +479,7 @@ def get_recording_details(recording_id: str) -> str:
     )
     rec = res["recording"]
     releases = [
-        f"  - {rel['title']} ({rel.get('date', '?')}) | release ID: {rel['id']}"
-        for rel in rec.get("release-list", [])
+        f"  - {rel['title']} ({rel.get('date', '?')}) | release ID: {rel['id']}" for rel in rec.get("release-list", [])
     ]
     isrcs = ", ".join(rec.get("isrc-list", [])) or "None"
     tags = [t["name"] for t in rec.get("tag-list", [])]
@@ -523,17 +506,13 @@ def get_album_tracks(release_group_id: str) -> str:
     """Fetches the tracklist with durations for a release group (album/EP/single).
     Takes a release_group_id (NOT a release_id). For a specific release's tracklist,
     use get_release_details instead."""
-    rg_result = musicbrainzngs.get_release_group_by_id(
-        release_group_id, includes=["releases"]
-    )
+    rg_result = musicbrainzngs.get_release_group_by_id(release_group_id, includes=["releases"])
     releases = rg_result["release-group"].get("release-list", [])
     if not releases:
         return "No releases found for this release group."
 
     release_id = releases[0]["id"]
-    release_details = musicbrainzngs.get_release_by_id(
-        release_id, includes=["recordings"]
-    )
+    release_details = musicbrainzngs.get_release_by_id(release_id, includes=["recordings"])
     tracks = _format_tracks(release_details["release"].get("medium-list", []))
     return "\n".join(tracks) if tracks else "No tracks found."
 
@@ -555,10 +534,7 @@ def get_release_group_details(release_group_id: str) -> str:
     rtype = rg.get("type", "Unknown")
     date = rg.get("first-release-date", "Unknown")
 
-    releases = [
-        f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}"
-        for r in rg.get("release-list", [])
-    ]
+    releases = [f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}" for r in rg.get("release-list", [])]
 
     parts = [
         f"Title: {rg['title']}",
@@ -607,8 +583,7 @@ def get_work_details(work_id: str) -> str:
         lang_str = f" [{lang}]" if lang else ""
         attrs_str = f" ({', '.join(attrs)})" if attrs else ""
         related_works.append(
-            f"  - {rtype.capitalize()}{attrs_str} ({direction}): "
-            f"{target['title']}{lang_str} | work ID: {target['id']}"
+            f"  - {rtype.capitalize()}{attrs_str} ({direction}): {target['title']}{lang_str} | work ID: {target['id']}"
         )
 
     parts = [
@@ -651,6 +626,15 @@ def get_area_details(area_id: str) -> str:
     ]
     return "\n".join(parts)
 
+
+def _extract_aliases_and_tags(entity_dict: dict, alias_limit: int = 10) -> tuple[str, str]:
+    """Helper to extract formatted aliases and genres/tags from an entity dictionary."""
+    aliases = ", ".join(al["alias"] for al in entity_dict.get("alias-list", [])[:alias_limit])
+    tags = [t["name"] for t in entity_dict.get("tag-list", [])]
+    genres = ", ".join(tags) if tags else ""
+    return aliases, genres
+
+
 @mcp.tool()
 @cached_tool()
 def get_event_details(event_id: str) -> str:
@@ -660,9 +644,7 @@ def get_event_details(event_id: str) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     ev = res["event"]
-    aliases = ", ".join(al["alias"] for al in ev.get("alias-list", [])[:10])
-    tags = [t["name"] for t in ev.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    aliases, genres = _extract_aliases_and_tags(ev)
     lifespan = ev.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "?")
@@ -688,9 +670,7 @@ def get_instrument_details(instrument_id: str) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     inst = res["instrument"]
-    aliases = ", ".join(al["alias"] for al in inst.get("alias-list", [])[:10])
-    tags = [t["name"] for t in inst.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    aliases, genres = _extract_aliases_and_tags(inst)
 
     parts = [
         f"Name: {inst['name']}",
@@ -712,9 +692,7 @@ def get_place_details(place_id: str) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     pl = res["place"]
-    aliases = ", ".join(al["alias"] for al in pl.get("alias-list", [])[:10])
-    tags = [t["name"] for t in pl.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
+    aliases, genres = _extract_aliases_and_tags(pl)
     coords = pl.get("coordinates", {})
     lat = coords.get("latitude", "N/A")
     lon = coords.get("longitude", "N/A")
@@ -741,10 +719,7 @@ def get_series_details(series_id: str) -> str:
         includes=["aliases", "tags", "url-rels"],
     )
     sr = res["series"]
-    aliases = ", ".join(al["alias"] for al in sr.get("alias-list", [])[:10])
-    tags = [t["name"] for t in sr.get("tag-list", [])]
-    genres = ", ".join(tags) if tags else ""
-
+    aliases, genres = _extract_aliases_and_tags(sr)
     parts = [
         f"Name: {sr['name']}",
         f"Type: {sr.get('type', 'N/A')}",
@@ -753,6 +728,7 @@ def get_series_details(series_id: str) -> str:
         f"MBID: {series_id}",
     ]
     return "\n".join(parts)
+
 
 @mcp.tool()
 @cached_tool()
@@ -766,9 +742,7 @@ def get_label_details(label_id: str) -> str:
     tags = [t["name"] for t in lb.get("tag-list", [])]
     genres = ", ".join(tags) if tags else ""
     aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:10])
-    urls = "\n".join(
-        f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", [])
-    )
+    urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
     end = lifespan.get("end", "present")
@@ -898,6 +872,7 @@ def get_cover_art_urls(release_id: str) -> str:
                 lines.append(f"  Thumbnail: {thumb_url}")
     return "\n".join(lines)
 
+
 @mcp.tool()
 @cached_tool()
 def get_release_group_cover_art(release_group_id: str) -> str:
@@ -910,22 +885,16 @@ def get_release_group_cover_art(release_group_id: str) -> str:
     except musicbrainzngs.ResponseError as e:
         # A 404 error from the archive simply means no art is uploaded yet,
         # which is common. We catch it here to return a friendly message to the AI.
-        if e.cause and getattr(e.cause, 'code', None) == 404:
-            return (
-                f"No cover art available for release group {release_group_id} "
-                "in the archive."
-            )
+        if e.cause and getattr(e.cause, "code", None) == 404:
+            return f"No cover art available for release group {release_group_id} in the archive."
         # If it's a different error (like 503), let the @cached_tool decorator handle it
         raise e
 
     img_list = images.get("images", [])
     if not img_list:
         return "No cover art images available."
-    
-    lines = [
-        f"Cover art for release group {release_group_id} "
-        f"({len(img_list)} images):"
-    ]
+
+    lines = [f"Cover art for release group {release_group_id} ({len(img_list)} images):"]
     for img in img_list:
         types = ", ".join(img.get("types", ["Unknown"]))
         lines.append(f"- [{types}] {img.get('image', 'N/A')}")
@@ -935,6 +904,7 @@ def get_release_group_cover_art(release_group_id: str) -> str:
             if thumb_url:
                 lines.append(f"  Thumbnail: {thumb_url}")
     return "\n".join(lines)
+
 
 @mcp.tool()
 @cached_tool()

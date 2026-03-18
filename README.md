@@ -23,7 +23,11 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_entity_relationships` | Relationships for any entity type (band members, producers, etc.) |
 | `get_cover_art_urls` | Cover art image URLs from the Cover Art Archive |
 | `lookup_by_barcode` | Find a release by UPC/EAN barcode |
-
+| `get_event_details` | Event info (concert, festival) with date, time, aliases, and tags |
+| `get_instrument_details` | Musical instrument info with type, description, aliases, and tags |
+| `get_place_details` | Place info (venue, studio) with address, coordinates, aliases, and tags |
+| `get_series_details` | Series info (release series, tour) with type, aliases, and tags |
+| `get_release_group_cover_art` | Cover art image URLs for a release group (album concept) |
 ## Setup
 
 Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
