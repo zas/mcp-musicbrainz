@@ -245,6 +245,30 @@ def browse_entities(
 
 @mcp.tool()
 @cached_tool()
+def browse_artist_releases(artist_id: str) -> str:
+    """Browse an artist's release groups (albums, EPs, singles, etc.)."""
+    res = musicbrainzngs.browse_release_groups(
+        artist=artist_id,
+        limit=50,
+    )
+    groups = res.get("release-group-list", [])
+    if not groups:
+        return f"No releases found for artist {artist_id}."
+
+    lines = [f"Releases for artist {artist_id} ({len(groups)} items):"]
+    for rg in groups:
+        title = rg.get("title", "Unknown")
+        rg_type = rg.get("type", "Unknown")
+        date = rg.get("first-release-date", "?")
+        rg_id = rg.get("id")
+
+        lines.append(f"  - {title} ({rg_type}, {date}) | ID: {rg_id}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
 def search_artists(
     name: str,
     country: str | None = None,

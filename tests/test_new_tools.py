@@ -156,3 +156,22 @@ def test_missing_entity_details():
         assert "Type: String" in get_instrument_details("i1")
         assert "Name: Test Place" in get_place_details("p1")
         assert "Name: Test Series" in get_series_details("s1")
+
+
+def test_browse_artist_releases():
+    class MockCache(dict):
+        def set(self, key, value, expire=None):
+            self[key] = value
+
+    mock_res = {
+        "release-group-list": [{"title": "1989", "type": "Album", "first-release-date": "2014-10-27", "id": "rg-123"}]
+    }
+
+    with (
+        mock.patch("musicbrainzngs.browse_release_groups", return_value=mock_res),
+        mock.patch("mcp_musicbrainz.server.cache", MockCache()),
+    ):
+        from mcp_musicbrainz.server import browse_artist_releases
+
+        res = browse_artist_releases("test-artist-id")
+        assert "1989 (Album, 2014-10-27) | ID: rg-123" in res
