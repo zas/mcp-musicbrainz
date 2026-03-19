@@ -37,7 +37,6 @@ Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 git clone https://github.com/zas/mcp-musicbrainz.git
 cd mcp-musicbrainz
-uv venv
 uv sync
 ```
 
@@ -81,9 +80,17 @@ All use the same configuration:
 ## Development
 
 ```bash
-uv sync --all-groups
+uv sync
 uv run pytest tests/ -v
 uv run ruff check .
+```
+
+### Pre-commit hooks
+
+Install [pre-commit](https://pre-commit.com/) hooks to automatically run linting and formatting on commit, and tests on push:
+
+```bash
+uv run pre-commit install
 ```
 
 ## Caching

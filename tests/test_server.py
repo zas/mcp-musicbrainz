@@ -5,6 +5,8 @@ from mcp_musicbrainz.server import (
     SEARCH_FUNCS,
     VALID_LINKED_TYPES,
     _fmt_duration,
+    _fmt_rating,
+    _fmt_tags,
     _format_tracks,
     _mb_error_message,
     browse_entities,
@@ -30,6 +32,26 @@ class TestFmtDuration:
 
     def test_under_one_minute(self):
         assert _fmt_duration(45000) == "0:45"
+
+
+class TestFmtRating:
+    def test_with_rating(self):
+        assert _fmt_rating({"rating": {"rating": "4.5", "votes-count": "3"}}) == "4.5/5 (3 votes)"
+
+    def test_no_rating(self):
+        assert _fmt_rating({}) == "N/A"
+
+    def test_empty_rating(self):
+        assert _fmt_rating({"rating": {}}) == "N/A"
+
+
+class TestFmtTags:
+    def test_sorted_by_count(self):
+        entity = {"tag-list": [{"count": "1", "name": "rock"}, {"count": "3", "name": "metal"}]}
+        assert _fmt_tags(entity) == "metal (3), rock (1)"
+
+    def test_empty(self):
+        assert _fmt_tags({}) == ""
 
 
 class TestFormatTracks:
