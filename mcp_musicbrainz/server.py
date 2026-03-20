@@ -898,6 +898,57 @@ def lookup_by_barcode(barcode: str) -> str:
 
 @mcp.tool()
 @cached_tool()
+def lookup_recording_by_isrc(isrc: str) -> str:
+    """
+    Lookup a recording by its International Standard Recording Code (ISRC).
+    This is the global ID used by Spotify, Apple Music, and record labels.
+    """
+    try:
+        res = musicbrainzngs.get_recordings_by_isrc(isrc.upper(), includes=["artists", "releases"])
+    except musicbrainzngs.ResponseError:
+        return f"No recording found for ISRC: {isrc.upper()}"
+
+    recordings = res.get("isrc", {}).get("recording-list", [])
+    if not recordings:
+        return f"No recording found for ISRC: {isrc.upper()}"
+
+    lines = [f"Found {len(recordings)} recording(s) for ISRC {isrc.upper()}:"]
+    for rec in recordings:
+        title = rec.get("title", "Unknown")
+        artist = rec.get("artist-credit-phrase", "Unknown")
+        rec_id = rec.get("id")
+        lines.append(f"  - {title} by {artist} | recording ID: {rec_id}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
+def lookup_work_by_iswc(iswc: str) -> str:
+    """
+    Lookup a musical work (composition/sheet music) by its ISWC.
+    This is the global ID used by music publishers and royalty societies.
+    """
+    try:
+        res = musicbrainzngs.get_works_by_iswc(iswc.upper())
+    except musicbrainzngs.ResponseError:
+        return f"No works found for ISWC: {iswc.upper()}"
+
+    works = res.get("work-list", [])
+    if not works:
+        return f"No works found for ISWC: {iswc.upper()}"
+
+    lines = [f"Found {len(works)} work(s) for ISWC {iswc.upper()}:"]
+    for w in works:
+        title = w.get("title", "Unknown")
+        w_id = w.get("id")
+        lines.append(f"  - {title} | work ID: {w_id}")
+
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
 def get_entity_relationships(entity_type: str, entity_id: str) -> str:
     """
     Get relationships for any entity type (e.g., band members, producers,

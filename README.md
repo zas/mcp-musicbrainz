@@ -23,6 +23,8 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_entity_relationships` | Relationships for any entity type (band members, producers, etc.) |
 | `get_cover_art_urls` | Cover art image URLs from the Cover Art Archive |
 | `lookup_by_barcode` | Find a release by UPC/EAN barcode |
+| `lookup_recording_by_isrc` | Translate a commercial ISRC (Spotify/Apple) to a MusicBrainz recording |
+| `lookup_work_by_iswc` | Translate a publisher's ISWC to a MusicBrainz work (composition) |
 | `get_event_details` | Event info (concert, festival) with date, time, aliases, and tags |
 | `get_instrument_details` | Musical instrument info with type, description, aliases, and tags |
 | `get_place_details` | Place info (venue, studio) with address, coordinates, aliases, and tags |
