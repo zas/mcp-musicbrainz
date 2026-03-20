@@ -580,3 +580,47 @@ class TestIDMismatchHints:
         with mock.patch("musicbrainzngs.get_release_group_by_id", side_effect=self._make_error()):
             res = get_album_tracks("wrong-id")
         assert "get_release_details" in res
+
+
+# ── Industry Standard Translation Tools (ISRC/ISWC) ──────────────────────────
+
+
+class TestIndustryTranslationTools:
+    def test_lookup_recording_by_isrc(self):
+        mock_res = {
+            "isrc": {
+                "recording-list": [
+                    {"title": "Smells Like Teen Spirit", "artist-credit-phrase": "Nirvana", "id": "rec-123"}
+                ]
+            }
+        }
+        with mock.patch("musicbrainzngs.get_recordings_by_isrc", return_value=mock_res):
+            from mcp_musicbrainz.server import lookup_recording_by_isrc
+
+            res = lookup_recording_by_isrc("USDC3234234")
+            assert "Smells Like Teen Spirit" in res
+            assert "Nirvana" in res
+            assert "rec-123" in res
+
+    def test_lookup_recording_by_isrc_not_found(self):
+        with mock.patch("musicbrainzngs.get_recordings_by_isrc", return_value={"isrc": {"recording-list": []}}):
+            from mcp_musicbrainz.server import lookup_recording_by_isrc
+
+            res = lookup_recording_by_isrc("BOGUS-ISRC")
+            assert "No recording found" in res
+
+    def test_lookup_work_by_iswc(self):
+        mock_res = {"work-list": [{"title": "Yesterday", "id": "work-456"}]}
+        with mock.patch("musicbrainzngs.get_works_by_iswc", return_value=mock_res):
+            from mcp_musicbrainz.server import lookup_work_by_iswc
+
+            res = lookup_work_by_iswc("T-123.456.789-C")
+            assert "Yesterday" in res
+            assert "work-456" in res
+
+    def test_lookup_work_by_iswc_not_found(self):
+        with mock.patch("musicbrainzngs.get_works_by_iswc", return_value={"work-list": []}):
+            from mcp_musicbrainz.server import lookup_work_by_iswc
+
+            res = lookup_work_by_iswc("BOGUS-ISWC")
+            assert "No works found" in res
