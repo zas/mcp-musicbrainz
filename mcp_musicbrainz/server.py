@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -9,6 +10,8 @@ import musicbrainzngs
 from fastmcp import FastMCP
 
 from mcp_musicbrainz import __version__
+
+logger = logging.getLogger(__name__)
 
 mcp = FastMCP("MusicBrainz")
 cache = diskcache.Cache(".musicbrainz_cache")
@@ -53,8 +56,9 @@ def cached_tool(expire: int = 86400) -> Callable:
                 msg = _mb_error_message(e)
                 hint = ID_HINT.get(func.__name__, "")  # type: ignore[union-attr]
                 return f"{msg} {hint}".strip() if hint else msg
-            except Exception as e:
-                return f"An unexpected error occurred: {e}"
+            except Exception:
+                logger.exception("Unexpected error in %s", func.__name__)  # type: ignore[union-attr]
+                return "An unexpected error occurred. Check server logs for details."
 
         return wrapper
 

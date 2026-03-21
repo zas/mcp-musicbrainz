@@ -45,4 +45,4 @@ def test_cached_tool_unexpected_error():
         raise ValueError("unexpected")
 
     res = error_func()
-    assert "unexpected error" in res
+    assert "An unexpected error occurred" in res
