@@ -4,7 +4,7 @@ Rules for AI agents working on this project.
 
 ## Architecture
 
-- Single-file MCP server: `mcp_musicbrainz/server.py`
+- Single-file MCP server: `mcp_musicbrainz/server.py` built with [FastMCP](https://gofastmcp.com/)
 - Each tool is a function decorated with `@mcp.tool()` and `@cached_tool()`
 - `musicbrainzngs` is the sole interface to the MusicBrainz API — [API docs](https://python-musicbrainzngs.readthedocs.io/en/latest/api/)
 - Responses are cached to disk (`.musicbrainz_cache/`) with 24h TTL
