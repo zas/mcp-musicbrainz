@@ -341,6 +341,52 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
+def search_recordings(
+    title: str | None = None,
+    artist: str | None = None,
+    release: str | None = None,
+    isrc: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for recordings with specific filters.
+    Prefer search_entities for simple title searches; use this when filtering
+    by artist, release, or ISRC.
+    Args:
+        title: Recording title
+        artist: Artist name
+        release: Release title the recording appears on
+        isrc: International Standard Recording Code
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
+    if title:
+        kwargs["recording"] = title
+    if artist:
+        kwargs["artist"] = artist
+    if release:
+        kwargs["release"] = release
+    if isrc:
+        kwargs["isrc"] = isrc
+
+    if not any((title, artist, release, isrc)):
+        return "Please provide at least one search parameter."
+
+    result = musicbrainzngs.search_recordings(**kwargs)
+    items = result.get("recording-list", [])
+    lines = [f"Found {len(items)} recordings:"]
+    for i in items:
+        rtitle = i.get("title")
+        rartist = i.get("artist-credit-phrase", "Unknown")
+        dur = _fmt_duration(i.get("length"))
+        lines.append(f"- {rtitle} by {rartist} ({dur}) | recording ID: {i['id']}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
 def search_release_groups(
     title: str | None = None,
     artist: str | None = None,

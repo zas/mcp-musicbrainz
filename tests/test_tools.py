@@ -30,6 +30,7 @@ from mcp_musicbrainz.server import (
     search_artists,
     search_entities,
     search_entities_fuzzy,
+    search_recordings,
     search_release_groups,
     search_releases,
 )
@@ -59,6 +60,7 @@ from tests.conftest import (
     RECTORY_RG_ID,
     RG_COVER_ART_RESPONSE,
     SEARCH_ARTISTS_RESPONSE,
+    SEARCH_RECORDINGS_RESPONSE,
     SEARCH_RELEASE_GROUPS_RESPONSE,
     SEARCH_RELEASES_RESPONSE,
     SINISTER_LABEL_ID,
@@ -186,6 +188,32 @@ class TestSearchReleases:
     def test_with_offset(self):
         with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
             search_releases(title="In the Rectory", offset=10)
+        assert m.call_args[1]["offset"] == 10
+
+
+# ── search_recordings ────────────────────────────────────────────────────────
+
+
+class TestSearchRecordings:
+    def test_basic_search(self):
+        with mock.patch("musicbrainzngs.search_recordings", return_value=SEARCH_RECORDINGS_RESPONSE):
+            res = search_recordings(title="Burn in Hell!")
+        assert "Found 1 recordings" in res
+        assert "Reverend Bizarre" in res
+        assert f"recording ID: {BURN_RECORDING_ID}" in res
+
+    def test_with_artist_filter(self):
+        with mock.patch("musicbrainzngs.search_recordings", return_value=SEARCH_RECORDINGS_RESPONSE) as m:
+            search_recordings(title="Burn in Hell!", artist="Reverend Bizarre")
+        assert m.call_args[1]["artist"] == "Reverend Bizarre"
+
+    def test_no_params(self):
+        res = search_recordings()
+        assert "Please provide at least one search parameter" in res
+
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_recordings", return_value=SEARCH_RECORDINGS_RESPONSE) as m:
+            search_recordings(title="Burn in Hell!", offset=10)
         assert m.call_args[1]["offset"] == 10
 
 

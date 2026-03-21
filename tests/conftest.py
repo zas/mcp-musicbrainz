@@ -378,6 +378,19 @@ SEARCH_RELEASES_RESPONSE = {
     "release-count": 1,
 }
 
+# -- search_recordings response --
+SEARCH_RECORDINGS_RESPONSE = {
+    "recording-list": [
+        {
+            "id": BURN_RECORDING_ID,
+            "title": "Burn in Hell!",
+            "length": "532413",
+            "artist-credit-phrase": "Reverend Bizarre",
+        },
+    ],
+    "recording-count": 1,
+}
+
 # -- search_release_groups response --
 SEARCH_RELEASE_GROUPS_RESPONSE = {
     "release-group-list": [
