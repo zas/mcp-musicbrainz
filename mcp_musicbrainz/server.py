@@ -1047,15 +1047,15 @@ def lookup_recording_by_isrc(isrc: str) -> str:
     """
     isrc = isrc.replace("-", "").replace(" ", "").upper()
     try:
-        res = musicbrainzngs.get_recordings_by_isrc(isrc.upper(), includes=["artists", "releases"])
+        res = musicbrainzngs.get_recordings_by_isrc(isrc, includes=["artists", "releases"])
     except musicbrainzngs.ResponseError:
-        return f"No recording found for ISRC: {isrc.upper()}"
+        return f"No recording found for ISRC: {isrc}"
 
     recordings = res.get("isrc", {}).get("recording-list", [])
     if not recordings:
-        return f"No recording found for ISRC: {isrc.upper()}"
+        return f"No recording found for ISRC: {isrc}"
 
-    lines = [f"Found {len(recordings)} recording(s) for ISRC {isrc.upper()}:"]
+    lines = [f"Found {len(recordings)} recording(s) for ISRC {isrc}:"]
     for rec in recordings:
         title = rec.get("title", "Unknown")
         artist = rec.get("artist-credit-phrase", "Unknown")
