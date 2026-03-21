@@ -1277,3 +1277,10 @@ def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     # Fall back to fuzzy matching
     fuzzy_query = " ".join([f"{word}~" for word in query.split()])
     return search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)
+
+
+@mcp.tool(annotations={"readOnlyHint": False, "idempotentHint": True, "openWorldHint": False})
+def clear_cache() -> str:
+    """Clear the local response cache. Only use when the user explicitly asks to refresh cached data."""
+    cache.clear()
+    return "Cache cleared."
