@@ -1177,9 +1177,16 @@ def get_entity_relationships(entity_type: str, entity_id: str, include_rels: lis
                 attrs = rel.get("attribute-list", [])
                 target = (
                     rel.get("artist", {}).get("name")
+                    or rel.get("label", {}).get("name")
+                    or rel.get("area", {}).get("name")
+                    or rel.get("place", {}).get("name")
+                    or rel.get("event", {}).get("name")
+                    or rel.get("instrument", {}).get("name")
+                    or rel.get("series", {}).get("name")
                     or rel.get("work", {}).get("title")
                     or rel.get("release", {}).get("title")
-                    or rel.get("label", {}).get("name")
+                    or rel.get("release-group", {}).get("title")
+                    or rel.get("recording", {}).get("title")
                     or rel.get("target", "Unknown")
                 )
                 attrs_str = f" ({', '.join(attrs)})" if attrs else ""
