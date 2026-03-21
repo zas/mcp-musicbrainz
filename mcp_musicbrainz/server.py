@@ -342,7 +342,7 @@ def search_releases(
     if label:
         kwargs["label"] = label
     if barcode:
-        kwargs["barcode"] = barcode
+        kwargs["barcode"] = "".join(c for c in barcode if c.isdigit())
 
     if not any((title, artist, label, barcode)):
         return "Please provide at least one search parameter."
@@ -967,6 +967,7 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
 @cached_tool()
 def lookup_by_barcode(barcode: str) -> str:
     """Finds a release by its UPC/EAN barcode."""
+    barcode = "".join(c for c in barcode if c.isdigit())
     result = musicbrainzngs.search_releases(barcode=barcode, limit=5)
     releases = result.get("release-list", [])
     if not releases:
