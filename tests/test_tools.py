@@ -162,6 +162,11 @@ class TestSearchArtists:
             search_artists("Reverend Bizarre", artist_type="group")
         assert m.call_args[1]["type"] == "group"
 
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            search_artists("Reverend Bizarre", offset=5)
+        assert m.call_args[1]["offset"] == 5
+
 
 # ── search_releases ──────────────────────────────────────────────────────────
 
@@ -177,6 +182,11 @@ class TestSearchReleases:
     def test_no_params(self):
         res = search_releases()
         assert "Please provide at least one search parameter" in res
+
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(title="In the Rectory", offset=10)
+        assert m.call_args[1]["offset"] == 10
 
 
 # ── search_release_groups ────────────────────────────────────────────────────
@@ -202,6 +212,11 @@ class TestSearchReleaseGroups:
     def test_no_params(self):
         res = search_release_groups()
         assert "Please provide at least one search parameter" in res
+
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_release_groups", return_value=SEARCH_RELEASE_GROUPS_RESPONSE) as m:
+            search_release_groups(title="In the Rectory", offset=15)
+        assert m.call_args[1]["offset"] == 15
 
 
 # ── get_artist_details ───────────────────────────────────────────────────────
