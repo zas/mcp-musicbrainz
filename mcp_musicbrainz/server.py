@@ -204,6 +204,7 @@ def browse_entities(
     linked_id: str,
     limit: int = 25,
     offset: int = 0,
+    includes: list[str] | None = None,
 ) -> str:
     """
     Browse MusicBrainz entities linked to another entity, with paging.
@@ -223,6 +224,11 @@ def browse_entities(
         linked_id: MBID of the linked entity
         limit: Results per page (max 100)
         offset: Paging offset
+        includes: Extra data to fetch per entity. Useful examples:
+            - 'labels' on releases: get label + catalog number per release
+            - 'artist-credits' on releases/recordings: get artist names
+            - 'tags' on most entity types: get genre tags
+            - 'isrcs' on recordings: get ISRCs
     """
     if entity_type not in BROWSE_FUNCS:
         return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(BROWSE_FUNCS)}"
@@ -235,7 +241,10 @@ def browse_entities(
             f"Valid linked types: {', '.join(sorted(valid_for_entity))}"
         )
 
-    result = BROWSE_FUNCS[entity_type](**{normalized: linked_id, "limit": min(limit, 100), "offset": offset})
+    kwargs: dict[str, Any] = {normalized: linked_id, "limit": min(limit, 100), "offset": offset}
+    if includes:
+        kwargs["includes"] = includes
+    result = BROWSE_FUNCS[entity_type](**kwargs)
     singular = entity_type.rstrip("s")
     list_key = f"{singular}-list"
     count_key = f"{singular}-count"
@@ -246,8 +255,14 @@ def browse_entities(
         name = i.get("title") or i.get("name", "?")
         date = i.get("first-release-date") or i.get("date", "")
         rtype = i.get("type") or i.get("primary-type", "")
-        extra = " | ".join(filter(None, [date, rtype]))
-        extra_str = f" ({extra})" if extra else ""
+        parts = [p for p in [date, rtype] if p]
+        # Append label info when available (from includes=['labels'])
+        for li in i.get("label-info-list", []):
+            lbl = li.get("label", {}).get("name")
+            cat = li.get("catalog-number")
+            if lbl:
+                parts.append(f"{lbl} ({cat})" if cat else lbl)
+        extra_str = f" ({' | '.join(parts)})" if parts else ""
         lines.append(f"- {name}{extra_str} | {singular} ID: {i['id']}")
     return "\n".join(lines)
 

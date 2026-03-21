@@ -385,6 +385,34 @@ BROWSE_RELEASES_RESPONSE = {
     "release-count": 48,
 }
 
+# -- browse_releases response with labels include --
+BROWSE_RELEASES_WITH_LABELS_RESPONSE = {
+    "release-list": [
+        {
+            "id": "77e0f608-e340-4c02-88a1-c11b33efc85d",
+            "title": "Practice Sessions",
+            "date": "1996",
+            "label-info-list": [
+                {"label": {"id": "157afde4-4bf5-4039-8ad2-5a15acc85176", "name": "[no label]"}},
+            ],
+            "label-info-count": 1,
+        },
+        {
+            "id": RECTORY_RELEASE_ID,
+            "title": "In the Rectory of the Bizarre Reverend",
+            "date": "2002-03-28",
+            "label-info-list": [
+                {
+                    "catalog-number": "SFGCD10",
+                    "label": {"id": "d7d0a16e-a051-49aa-b6f5-20aba76b1143", "name": "Sinister Figure"},
+                },
+            ],
+            "label-info-count": 1,
+        },
+    ],
+    "release-count": 48,
+}
+
 # -- search_releases response --
 SEARCH_RELEASES_RESPONSE = {
     "release-list": [
