@@ -261,6 +261,7 @@ def search_artists(
     gender: str | None = None,
     limit: int = 5,
     offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for artists with specific filters.
@@ -273,8 +274,9 @@ def search_artists(
         gender: 'male', 'female', 'other', 'not applicable'
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs = {"artist": name, "limit": limit, "offset": offset}
+    kwargs: dict[str, Any] = {"artist": name, "limit": limit, "offset": offset, "strict": strict}
     if country:
         kwargs["country"] = country
     if artist_type:
@@ -302,6 +304,7 @@ def search_releases(
     barcode: str | None = None,
     limit: int = 5,
     offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for releases with specific filters.
@@ -314,8 +317,9 @@ def search_releases(
         barcode: UPC/EAN barcode
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
     if title:
         kwargs["release"] = title
     if artist:
@@ -348,6 +352,7 @@ def search_recordings(
     isrc: str | None = None,
     limit: int = 5,
     offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for recordings with specific filters.
@@ -360,8 +365,9 @@ def search_recordings(
         isrc: International Standard Recording Code
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
     if title:
         kwargs["recording"] = title
     if artist:
@@ -393,6 +399,7 @@ def search_release_groups(
     release_group_type: str | None = None,
     limit: int = 5,
     offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for release groups (albums/EPs/singles) with specific filters.
@@ -404,8 +411,9 @@ def search_release_groups(
         release_group_type: 'album', 'ep', 'single', 'broadcast', 'other'
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"limit": limit, "offset": offset}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
     if title:
         kwargs["releasegroup"] = title
     if artist:
