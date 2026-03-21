@@ -94,31 +94,21 @@ VALID_LINKED_TYPES = {
     "release_group",
     "work",
     "area",
-    "collection",
-    "track",
+    "place",
     "track_artist",
 }
 
-# Valid (entity_type, linked_type) browse combinations per MusicBrainz API.
+# Valid (entity_type, linked_type) browse combinations per musicbrainzngs function signatures.
 # Note: "areas" browse is not supported by musicbrainzngs.
 VALID_BROWSE_COMBINATIONS: dict[str, set[str]] = {
-    "artists": {"area", "collection", "recording", "release", "release_group", "work"},
-    "events": {"area", "artist", "collection", "place"},
-    "labels": {"area", "collection", "release"},
-    "places": {"area", "collection"},
-    "recordings": {"artist", "collection", "release", "work"},
-    "releases": {
-        "area",
-        "artist",
-        "collection",
-        "label",
-        "track",
-        "track_artist",
-        "recording",
-        "release_group",
-    },
-    "release-groups": {"artist", "collection", "release"},
-    "works": {"artist", "collection"},
+    "artists": {"recording", "release", "release_group", "work"},
+    "events": {"area", "artist", "place"},
+    "labels": {"release"},
+    "places": {"area"},
+    "recordings": {"artist", "release"},
+    "releases": {"artist", "track_artist", "label", "recording", "release_group"},
+    "release-groups": {"artist", "release"},
+    "works": {"artist"},
 }
 
 
@@ -472,7 +462,6 @@ def get_artist_discography(
         artist=artist_id,
         limit=min(limit, 100),
         offset=offset,
-        includes=["releases"],
     )
     items = res.get("release-group-list", [])
     count = res.get("release-group-count", len(items))
