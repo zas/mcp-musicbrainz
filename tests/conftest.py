@@ -279,6 +279,25 @@ GET_RECORDING_RESPONSE = {
             {"count": "1", "name": "finnish metal"},
         ],
         "rating": {"votes-count": "2", "rating": "4.25"},
+        "work-relation-list": [
+            {
+                "type": "performance",
+                "work": {
+                    "id": BURN_WORK_ID,
+                    "title": "Burn in Hell",
+                    "artist-relation-list": [
+                        {
+                            "type": "composer",
+                            "artist": {"id": "80c4f609-e9e6-440d-aa8d-252224ef4d92", "name": "Dee Snider"},
+                        },
+                        {
+                            "type": "lyricist",
+                            "artist": {"id": "80c4f609-e9e6-440d-aa8d-252224ef4d92", "name": "Dee Snider"},
+                        },
+                    ],
+                },
+            },
+        ],
     }
 }
 

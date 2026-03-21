@@ -589,6 +589,7 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
             "isrcs",
             "tags",
             "ratings",
+            "work-level-rels",
         ],
     )
     rec = res["recording"]
@@ -602,6 +603,18 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
 
     rating_str = _fmt_rating(rec)
 
+    # Extract linked works and their artist relationships (composers, lyricists)
+    works = []
+    for rel in rec.get("work-relation-list", []):
+        w = rel.get("work", {})
+        w_title = w.get("title", "?")
+        w_id = w.get("id", "")
+        creators = []
+        for ar in w.get("artist-relation-list", []):
+            creators.append(f"{ar['type'].capitalize()}: {ar['artist']['name']}")
+        creators_str = f" — {', '.join(creators)}" if creators else ""
+        works.append(f"  - {w_title}{creators_str} | work ID: {w_id}")
+
     parts = [
         f"Title: {rec['title']}",
         f"Artist: {artist}",
@@ -610,9 +623,12 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {recording_id}",
-        f"\nAppears on ({len(releases)} releases):",
-        *releases[:releases_limit],
     ]
+    if works:
+        parts.append(f"\nWorks ({len(works)}):")
+        parts.extend(works)
+    parts.append(f"\nAppears on ({len(releases)} releases):")
+    parts.extend(releases[:releases_limit])
     if len(releases) > releases_limit:
         parts.append(
             f"  ... and {len(releases) - releases_limit} more."

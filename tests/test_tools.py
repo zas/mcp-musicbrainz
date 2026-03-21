@@ -350,6 +350,10 @@ class TestGetRecordingDetails:
         assert "FISFS0404002" in res
         assert "doom metal (2)" in res
         assert "Rating: 4.25/5 (2 votes)" in res
+        assert "Works (1):" in res
+        assert "Burn in Hell" in res
+        assert "Composer: Dee Snider" in res
+        assert f"work ID: {BURN_WORK_ID}" in res
         assert "Appears on (3 releases)" in res
 
     def test_releases_limit(self):
