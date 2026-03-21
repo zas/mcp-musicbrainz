@@ -3,13 +3,16 @@ from __future__ import annotations
 import functools
 import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NewType
 
 import diskcache
 import musicbrainzngs
 from fastmcp import FastMCP
 
 from mcp_musicbrainz import __version__
+
+#: MusicBrainz Identifier — a UUID that uniquely identifies an entity (artist, release, recording, etc.)
+MBID = NewType("MBID", str)
 
 logger = logging.getLogger(__name__)
 
@@ -251,7 +254,7 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
 def browse_entities(
     entity_type: str,
     linked_type: str,
-    linked_id: str,
+    linked_id: MBID,
     limit: int = 25,
     offset: int = 0,
     includes: list[str] | None = None,
@@ -512,7 +515,7 @@ def search_release_groups(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
+def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,
     and their discography (Release Groups) with MBIDs.
@@ -573,7 +576,7 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_artist_discography(
-    artist_id: str,
+    artist_id: MBID,
     limit: int = 25,
     offset: int = 0,
 ) -> str:
@@ -602,7 +605,7 @@ def get_artist_discography(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_release_details(release_id: str) -> str:
+def get_release_details(release_id: MBID) -> str:
     """Get tracklist with durations, barcode, and label for a specific release.
     Takes a release_id (a specific edition), NOT a release_group_id.
     To get tracks for an album concept, use get_album_tracks with a release_group_id."""
@@ -649,7 +652,7 @@ def get_release_details(release_id: str) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
+def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
     """
     Get recording details: artist, duration, ISRCs, tags, and which
     releases (albums/singles) it appears on.
@@ -716,7 +719,7 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_album_tracks(release_group_id: str) -> str:
+def get_album_tracks(release_group_id: MBID) -> str:
     """Fetches the tracklist with durations for a release group (album/EP/single).
     Takes a release_group_id (NOT a release_id). For a specific release's tracklist,
     use get_release_details instead."""
@@ -739,7 +742,7 @@ def get_album_tracks(release_group_id: str) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
+def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
     A release group contains one or more releases (specific editions).
     Use get_release_details for a specific edition's tracklist and barcode.
@@ -783,7 +786,7 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_work_details(work_id: str) -> str:
+def get_work_details(work_id: MBID) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
     res = musicbrainzngs.get_work_by_id(
         work_id,
@@ -839,7 +842,7 @@ def get_work_details(work_id: str) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_area_details(area_id: str, alias_limit: int = 10) -> str:
+def get_area_details(area_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a geographic area (country, city).
     Args:
         area_id: The MBID
@@ -874,7 +877,7 @@ def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_event_details(event_id: str, alias_limit: int = 10) -> str:
+def get_event_details(event_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a music event (concert, festival, etc.).
     Args:
         event_id: The MBID
@@ -904,7 +907,7 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
+def get_instrument_details(instrument_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a musical instrument.
     Args:
         instrument_id: The MBID
@@ -930,7 +933,7 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_place_details(place_id: str, alias_limit: int = 10) -> str:
+def get_place_details(place_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a place (venue, studio, etc.).
     Args:
         place_id: The MBID
@@ -961,7 +964,7 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_series_details(series_id: str, alias_limit: int = 10) -> str:
+def get_series_details(series_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a series (release series, tour, etc.).
     Args:
         series_id: The MBID
@@ -985,7 +988,7 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_label_details(label_id: str, alias_limit: int = 10) -> str:
+def get_label_details(label_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a record label including type, area, tags, and URLs.
     Args:
         label_id: The MBID
@@ -1130,7 +1133,7 @@ ALL_REL_INCLUDES = [
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_entity_relationships(entity_type: str, entity_id: str, include_rels: list[str] | None = None) -> str:
+def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: list[str] | None = None) -> str:
     """
     Get relationships for any entity type (e.g., band members, producers,
     recording studios, Wikipedia links).
@@ -1205,7 +1208,7 @@ def get_entity_relationships(entity_type: str, entity_id: str, include_rels: lis
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_cover_art_urls(release_id: str) -> str:
+def get_cover_art_urls(release_id: MBID) -> str:
     """Get cover art image URLs for a specific release (edition)
     from the Cover Art Archive.
     Takes a release_id, NOT a release_group_id.
@@ -1228,7 +1231,7 @@ def get_cover_art_urls(release_id: str) -> str:
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_release_group_cover_art(release_group_id: str) -> str:
+def get_release_group_cover_art(release_group_id: MBID) -> str:
     """Get cover art image URLs for a release group (album/EP concept)
     from the Cover Art Archive.
     Takes a release_group_id, NOT a release_id.
