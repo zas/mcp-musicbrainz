@@ -21,7 +21,7 @@ cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 3
+CACHE_VERSION = 4
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -533,6 +533,7 @@ def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit
             "ratings",
             "release-groups",
             "url-rels",
+            "annotation",
         ],
     )
     a = res["artist"]
@@ -564,6 +565,7 @@ def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit
         f"Aliases: {aliases or 'None'}",
         f"MBID: {a['id']}",
     ]
+    _append_extras(parts, a)
     if urls:
         parts.append(f"URLs:\n{urls}")
     parts.append(
@@ -617,6 +619,7 @@ def get_release_details(release_id: MBID) -> str:
             "artist-credits",
             "media",
             "release-groups",
+            "annotation",
         ],
     )
     r = res["release"]
@@ -645,8 +648,9 @@ def get_release_details(release_id: MBID) -> str:
         f"Tags: {rg_tags or 'None listed'}",
         f"Release Group: {rg.get('title', 'N/A')} | release-group ID: {rg.get('id', 'N/A')}",
         f"MBID: {release_id}",
-        "\nTracklist:\n" + "\n".join(tracks),
     ]
+    _append_extras(parts, r)
+    parts.append("\nTracklist:\n" + "\n".join(tracks))
     return "\n".join(parts)
 
 
@@ -669,6 +673,7 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
             "tags",
             "ratings",
             "work-level-rels",
+            "annotation",
         ],
     )
     rec = res["recording"]
@@ -703,6 +708,7 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
         f"Rating: {rating_str}",
         f"MBID: {recording_id}",
     ]
+    _append_extras(parts, rec)
     if works:
         parts.append(f"\nWorks ({len(works)}):")
         parts.extend(works)
@@ -752,7 +758,7 @@ def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) 
     """
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
-        includes=["artists", "releases", "tags", "ratings", "url-rels"],
+        includes=["artists", "releases", "tags", "ratings", "url-rels", "annotation"],
     )
     rg = res["release-group"]
     tags = _fmt_tags(rg)
@@ -772,9 +778,10 @@ def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) 
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {release_group_id}",
-        f"\nReleases in this group ({len(releases)}):",
-        *releases[:releases_limit],
     ]
+    _append_extras(parts, rg)
+    parts.append(f"\nReleases in this group ({len(releases)}):")
+    parts.extend(releases[:releases_limit])
     if len(releases) > releases_limit:
         parts.append(
             f"  ... and {len(releases) - releases_limit} more."
@@ -790,7 +797,7 @@ def get_work_details(work_id: MBID) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
     res = musicbrainzngs.get_work_by_id(
         work_id,
-        includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings"],
+        includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings", "annotation"],
     )
     w = res["work"]
     tags = _fmt_tags(w)
@@ -828,9 +835,10 @@ def get_work_details(work_id: MBID) -> str:
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {work_id}",
-        "\nCreators:",
-        *(creators or ["  - No creators listed"]),
     ]
+    _append_extras(parts, w)
+    parts.append("\nCreators:")
+    parts.extend(creators or ["  - No creators listed"])
     if publishers:
         parts.append("\nPublishers:")
         parts.extend(publishers)
@@ -850,7 +858,7 @@ def get_area_details(area_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_area_by_id(
         area_id,
-        includes=["aliases", "url-rels"],
+        includes=["aliases", "url-rels", "annotation"],
     )
     a = res["area"]
     aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
@@ -865,7 +873,28 @@ def get_area_details(area_id: MBID, alias_limit: int = 10) -> str:
         f"Aliases: {aliases or 'None'}",
         f"MBID: {area_id}",
     ]
+    _append_extras(parts, a)
     return "\n".join(parts)
+
+
+def _fmt_disambiguation(entity: dict[str, Any]) -> str:
+    """Return disambiguation string or empty string."""
+    return entity.get("disambiguation", "")
+
+
+def _fmt_annotation(entity: dict[str, Any]) -> str:
+    """Return annotation text or empty string."""
+    return entity.get("annotation", {}).get("text", "")
+
+
+def _append_extras(parts: list[str], entity: dict[str, Any]) -> None:
+    """Append disambiguation and annotation to output parts if present."""
+    disambiguation = _fmt_disambiguation(entity)
+    if disambiguation:
+        parts.append(f"Disambiguation: {disambiguation}")
+    annotation = _fmt_annotation(entity)
+    if annotation:
+        parts.append(f"\nAnnotation:\n{annotation}")
 
 
 def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10) -> tuple[str, str]:
@@ -885,7 +914,7 @@ def get_event_details(event_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_event_by_id(
         event_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     ev = res["event"]
     aliases, tags = _extract_aliases_and_tags(ev, alias_limit)
@@ -902,6 +931,7 @@ def get_event_details(event_id: MBID, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {event_id}",
     ]
+    _append_extras(parts, ev)
     return "\n".join(parts)
 
 
@@ -915,7 +945,7 @@ def get_instrument_details(instrument_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_instrument_by_id(
         instrument_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     inst = res["instrument"]
     aliases, tags = _extract_aliases_and_tags(inst, alias_limit)
@@ -928,6 +958,7 @@ def get_instrument_details(instrument_id: MBID, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {instrument_id}",
     ]
+    _append_extras(parts, inst)
     return "\n".join(parts)
 
 
@@ -941,7 +972,7 @@ def get_place_details(place_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_place_by_id(
         place_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     pl = res["place"]
     aliases, tags = _extract_aliases_and_tags(pl, alias_limit)
@@ -959,6 +990,7 @@ def get_place_details(place_id: MBID, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {place_id}",
     ]
+    _append_extras(parts, pl)
     return "\n".join(parts)
 
 
@@ -972,7 +1004,7 @@ def get_series_details(series_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_series_by_id(
         series_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     sr = res["series"]
     aliases, tags = _extract_aliases_and_tags(sr, alias_limit)
@@ -983,6 +1015,7 @@ def get_series_details(series_id: MBID, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {series_id}",
     ]
+    _append_extras(parts, sr)
     return "\n".join(parts)
 
 
@@ -996,7 +1029,7 @@ def get_label_details(label_id: MBID, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_label_by_id(
         label_id,
-        includes=["aliases", "tags", "ratings", "url-rels"],
+        includes=["aliases", "tags", "ratings", "url-rels", "annotation"],
     )
     lb = res["label"]
     aliases, tags = _extract_aliases_and_tags(lb, alias_limit)
@@ -1018,6 +1051,7 @@ def get_label_details(label_id: MBID, alias_limit: int = 10) -> str:
         f"Aliases: {aliases or 'None'}",
         f"MBID: {lb['id']}",
     ]
+    _append_extras(parts, lb)
     if urls:
         parts.append(f"URLs:\n{urls}")
     return "\n".join(parts)

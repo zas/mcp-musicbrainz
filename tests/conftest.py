@@ -52,6 +52,7 @@ GET_ARTIST_RESPONSE = {
         "country": "FI",
         "disambiguation": "Finnish doom metal band",
         "life-span": {"begin": "1995", "end": "2007", "ended": "true"},
+        "annotation": {"text": "Formed in Loimaa, Finland."},
         "alias-list": [
             {"sort-name": "Reverand Bizarre", "type": "Search hint", "alias": "Reverand Bizarre"},
             {"sort-name": "Reverend Bizare", "type": "Search hint", "alias": "Reverend Bizare"},
@@ -166,6 +167,8 @@ GET_RELEASE_RESPONSE = {
         "date": "2002-03-28",
         "country": "FI",
         "barcode": RECTORY_BARCODE,
+        "disambiguation": "first press",
+        "annotation": {"text": "Recorded at Tico-Tico Studio."},
         "artist-credit-phrase": "Reverend Bizarre",
         "release-group": {
             "id": RECTORY_RG_ID,
