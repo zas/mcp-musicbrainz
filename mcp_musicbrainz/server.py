@@ -531,8 +531,7 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
         ],
     )
     a = res["artist"]
-    tags = _fmt_tags(a)
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
+    aliases, tags = _extract_aliases_and_tags(a, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
     rg_list = sorted(
@@ -995,8 +994,7 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
         includes=["aliases", "tags", "ratings", "url-rels"],
     )
     lb = res["label"]
-    tags = _fmt_tags(lb)
-    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:alias_limit])
+    aliases, tags = _extract_aliases_and_tags(lb, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
