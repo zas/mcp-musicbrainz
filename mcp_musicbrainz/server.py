@@ -1015,9 +1015,40 @@ def lookup_work_by_iswc(iswc: str) -> str:
     return "\n".join(lines)
 
 
+ENTITY_LOOKUP_FUNCS: dict[str, str] = {
+    "artist": "get_artist_by_id",
+    "release": "get_release_by_id",
+    "release-group": "get_release_group_by_id",
+    "recording": "get_recording_by_id",
+    "work": "get_work_by_id",
+    "label": "get_label_by_id",
+    "area": "get_area_by_id",
+    "place": "get_place_by_id",
+    "event": "get_event_by_id",
+    "instrument": "get_instrument_by_id",
+    "series": "get_series_by_id",
+}
+
+# Relationship includes available for all entity types.
+ALL_REL_INCLUDES = [
+    "area-rels",
+    "artist-rels",
+    "event-rels",
+    "instrument-rels",
+    "label-rels",
+    "place-rels",
+    "recording-rels",
+    "release-group-rels",
+    "release-rels",
+    "series-rels",
+    "url-rels",
+    "work-rels",
+]
+
+
 @mcp.tool()
 @cached_tool()
-def get_entity_relationships(entity_type: str, entity_id: str) -> str:
+def get_entity_relationships(entity_type: str, entity_id: str, include_rels: list[str] | None = None) -> str:
     """
     Get relationships for any entity type (e.g., band members, producers,
     recording studios, Wikipedia links).
@@ -1025,37 +1056,33 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
         entity_type: artist, release, release-group, recording, work, label, area,
                      place, event, instrument, series
         entity_id: The MBID (must match the entity_type)
+        include_rels: Which relationship types to fetch. Default (None) fetches
+            artist-rels and url-rels. Available types:
+            - area-rels: linked geographic areas
+            - artist-rels: linked artists (members, producers, performers)
+            - event-rels: linked events
+            - instrument-rels: linked instruments
+            - label-rels: linked labels (publishers, distributors)
+            - place-rels: linked places (studios, venues)
+            - recording-rels: linked recordings
+            - release-group-rels: linked release groups
+            - release-rels: linked releases
+            - series-rels: linked series
+            - url-rels: linked URLs (Wikipedia, Discogs, etc.)
+            - work-rels: linked works
     """
-    valid_types = {
-        "artist": (musicbrainzngs.get_artist_by_id, ["artist-rels", "url-rels"]),
-        "release": (musicbrainzngs.get_release_by_id, ["artist-rels", "url-rels"]),
-        "release-group": (
-            musicbrainzngs.get_release_group_by_id,
-            ["artist-rels", "url-rels"],
-        ),
-        "recording": (
-            musicbrainzngs.get_recording_by_id,
-            ["artist-rels", "work-rels", "url-rels"],
-        ),
-        "work": (
-            musicbrainzngs.get_work_by_id,
-            ["artist-rels", "label-rels", "work-rels", "url-rels"],
-        ),
-        "label": (musicbrainzngs.get_label_by_id, ["artist-rels", "url-rels"]),
-        "area": (musicbrainzngs.get_area_by_id, ["area-rels", "url-rels"]),
-        "place": (musicbrainzngs.get_place_by_id, ["place-rels", "url-rels"]),
-        "event": (musicbrainzngs.get_event_by_id, ["artist-rels", "url-rels"]),
-        "instrument": (
-            musicbrainzngs.get_instrument_by_id,
-            ["instrument-rels", "url-rels"],
-        ),
-        "series": (musicbrainzngs.get_series_by_id, ["series-rels", "url-rels"]),
-    }
+    if entity_type not in ENTITY_LOOKUP_FUNCS:
+        return f"Invalid entity type. Choose from: {', '.join(ENTITY_LOOKUP_FUNCS.keys())}"
 
-    if entity_type not in valid_types:
-        return f"Invalid entity type. Choose from: {', '.join(valid_types.keys())}"
+    if include_rels is None:
+        includes = ["artist-rels", "url-rels"]
+    else:
+        invalid = [r for r in include_rels if r not in ALL_REL_INCLUDES]
+        if invalid:
+            return f"Invalid relationship types: {', '.join(invalid)}. Valid: {', '.join(ALL_REL_INCLUDES)}"
+        includes = include_rels
 
-    func, includes = valid_types[entity_type]
+    func = getattr(musicbrainzngs, ENTITY_LOOKUP_FUNCS[entity_type])
     res = func(entity_id, includes=includes)
     entity = res.get(entity_type)
     if not entity:
