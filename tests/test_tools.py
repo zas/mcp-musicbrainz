@@ -38,6 +38,7 @@ from tests.conftest import (
     BARCODE_LOOKUP_RESPONSE,
     BROWSE_RELEASE_GROUPS_RESPONSE,
     BROWSE_RELEASES_RESPONSE,
+    BROWSE_RELEASES_WITH_LABELS_RESPONSE,
     BURN_RECORDING_ID,
     BURN_WORK_ID,
     COVER_ART_RESPONSE,
@@ -141,6 +142,15 @@ class TestBrowseEntities:
         with mock.patch("musicbrainzngs.browse_releases", return_value=BROWSE_RELEASES_RESPONSE):
             res = browse_entities("releases", "release-group", RECTORY_RG_ID)
         assert "Showing" in res
+
+    def test_includes_labels(self):
+        """includes=['labels'] should pass through and show label info in output."""
+        mock_fn = mock.Mock(return_value=BROWSE_RELEASES_WITH_LABELS_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.BROWSE_FUNCS", {"releases": mock_fn}):
+            res = browse_entities("releases", "artist", RB_ARTIST_ID, includes=["labels"])
+        assert mock_fn.call_args[1]["includes"] == ["labels"]
+        assert "Sinister Figure (SFGCD10)" in res
+        assert "[no label]" in res
 
 
 # ── search_artists ───────────────────────────────────────────────────────────
