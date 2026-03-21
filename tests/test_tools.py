@@ -576,6 +576,15 @@ class TestGetEntityRelationships:
         assert "Peter Vicar" in res
         assert "bandcamp" in res
 
+    def test_custom_include_rels(self):
+        with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RELS_RESPONSE) as m:
+            get_entity_relationships("artist", RB_ARTIST_ID, include_rels=["label-rels", "place-rels"])
+        assert m.call_args[1]["includes"] == ["label-rels", "place-rels"]
+
+    def test_invalid_include_rels(self):
+        res = get_entity_relationships("artist", RB_ARTIST_ID, include_rels=["bogus-rels"])
+        assert "Invalid relationship types" in res
+
     def test_invalid_entity_type(self):
         res = get_entity_relationships("bogus", "some-id")
         assert "Invalid entity type" in res
