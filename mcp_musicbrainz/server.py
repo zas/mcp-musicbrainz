@@ -15,7 +15,7 @@ cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 2
+CACHE_VERSION = 3
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -152,6 +152,48 @@ def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
     return tracks
 
 
+def _search_result_detail(entity_type: str, item: dict[str, Any]) -> str:
+    """Extract key details from a search result to reduce follow-up queries."""
+    parts: list[str] = []
+    if entity_type == "artist":
+        if t := item.get("type"):
+            parts.append(t)
+        if c := item.get("country"):
+            parts.append(c)
+        ls = item.get("life-span", {})
+        if begin := ls.get("begin"):
+            end = ls.get("end", "present")
+            parts.append(f"{begin}–{end}")
+    elif entity_type == "release":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if d := item.get("date"):
+            parts.append(d)
+        if c := item.get("country"):
+            parts.append(c)
+        for li in item.get("label-info-list", []):
+            if lbl := li.get("label", {}).get("name"):
+                parts.append(lbl)
+    elif entity_type == "recording":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if length := item.get("length"):
+            parts.append(_fmt_duration(length))
+    elif entity_type == "release-group":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if d := item.get("first-release-date"):
+            parts.append(d)
+        if t := item.get("type") or item.get("primary-type"):
+            parts.append(t)
+    elif entity_type == "label":
+        if t := item.get("type"):
+            parts.append(t)
+        if c := item.get("country"):
+            parts.append(c)
+    return ", ".join(parts)
+
+
 @mcp.tool()
 @cached_tool()
 def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
@@ -192,7 +234,9 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
         name = i.get("name") or i.get("title")
         disambig = i.get("disambiguation", "")
         extra = f" ({disambig})" if disambig else ""
-        lines.append(f"- {name}{extra} | {entity_type} ID: {i['id']}")
+        detail = _search_result_detail(entity_type, i)
+        detail_str = f" [{detail}]" if detail else ""
+        lines.append(f"- {name}{extra}{detail_str} | {entity_type} ID: {i['id']}")
     return "\n".join(lines)
 
 
@@ -354,7 +398,16 @@ def search_releases(
         rtitle = i.get("title")
         rartist = i.get("artist-credit-phrase", "Unknown")
         date = i.get("date", "?")
-        lines.append(f"- {rtitle} by {rartist} ({date}) | release ID: {i['id']}")
+        country = i.get("country", "")
+        labels = ", ".join(
+            li.get("label", {}).get("name", "")
+            for li in i.get("label-info-list", [])
+            if li.get("label", {}).get("name")
+        )
+        rg = i.get("release-group", {})
+        rg_info = f" | release-group ID: {rg['id']}" if rg.get("id") else ""
+        extras = " | ".join(filter(None, [date, country, labels]))
+        lines.append(f"- {rtitle} by {rartist} ({extras}) | release ID: {i['id']}{rg_info}")
     return "\n".join(lines)
 
 
