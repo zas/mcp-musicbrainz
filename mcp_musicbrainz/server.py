@@ -985,7 +985,9 @@ def lookup_recording_by_isrc(isrc: str) -> str:
     """
     Lookup a recording by its International Standard Recording Code (ISRC).
     This is the global ID used by Spotify, Apple Music, and record labels.
+    Accepts both formatted (FI-UM7-07-00377) and compact (FIUM70700377) forms.
     """
+    isrc = isrc.replace("-", "").replace(" ", "").upper()
     try:
         res = musicbrainzngs.get_recordings_by_isrc(isrc.upper(), includes=["artists", "releases"])
     except musicbrainzngs.ResponseError:
@@ -1011,7 +1013,12 @@ def lookup_work_by_iswc(iswc: str) -> str:
     """
     Lookup a musical work (composition/sheet music) by its ISWC.
     This is the global ID used by music publishers and royalty societies.
+    Accepts both formatted (T-345.246.800-1) and compact (T3452468001) forms.
     """
+    # Normalize to formatted form: T-NNN.NNN.NNN-C
+    clean = iswc.replace("-", "").replace(".", "").replace(" ", "").upper()
+    if len(clean) == 11 and clean[0] == "T":
+        iswc = f"{clean[0]}-{clean[1:4]}.{clean[4:7]}.{clean[7:10]}-{clean[10]}"
     try:
         res = musicbrainzngs.get_works_by_iswc(iswc.upper())
     except musicbrainzngs.ResponseError:
