@@ -555,6 +555,7 @@ def get_release_details(release_id: str) -> str:
     country = r.get("country", "N/A")
     rg = r.get("release-group", {})
     rg_type = rg.get("type", "N/A")
+    rg_tags = _fmt_tags(rg)
 
     parts = [
         f"Title: {r['title']}",
@@ -565,6 +566,8 @@ def get_release_details(release_id: str) -> str:
         f"Type: {rg_type}",
         f"Barcode: {barcode}",
         f"Label: {labels or 'N/A'}",
+        f"Tags: {rg_tags or 'None listed'}",
+        f"Release Group: {rg.get('title', 'N/A')} | release-group ID: {rg.get('id', 'N/A')}",
         f"MBID: {release_id}",
         "\nTracklist:\n" + "\n".join(tracks),
     ]

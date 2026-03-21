@@ -326,6 +326,8 @@ class TestGetReleaseDetails:
         assert "Country: FI" in res
         assert "Barcode: 6420074201020" in res
         assert "Sinister Figure (SFGCD10)" in res
+        assert "Tags: doom metal (2)" in res
+        assert f"release-group ID: {RECTORY_RG_ID}" in res
         assert "1. Burn in Hell! (8:52)" in res
         assert "6. Cirith Ungol (21:09)" in res
 

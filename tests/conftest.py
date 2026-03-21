@@ -171,6 +171,7 @@ GET_RELEASE_RESPONSE = {
             "id": RECTORY_RG_ID,
             "type": "Album",
             "title": "In the Rectory of the Bizarre Reverend",
+            "tag-list": [{"count": "2", "name": "doom metal"}],
         },
         "label-info-list": [
             {
