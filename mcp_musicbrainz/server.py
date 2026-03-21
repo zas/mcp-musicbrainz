@@ -1073,16 +1073,18 @@ def lookup_work_by_iswc(iswc: str) -> str:
     clean = iswc.replace("-", "").replace(".", "").replace(" ", "").upper()
     if len(clean) == 11 and clean[0] == "T":
         iswc = f"{clean[0]}-{clean[1:4]}.{clean[4:7]}.{clean[7:10]}-{clean[10]}"
+    else:
+        iswc = clean
     try:
-        res = musicbrainzngs.get_works_by_iswc(iswc.upper())
+        res = musicbrainzngs.get_works_by_iswc(iswc)
     except musicbrainzngs.ResponseError:
-        return f"No works found for ISWC: {iswc.upper()}"
+        return f"No works found for ISWC: {iswc}"
 
     works = res.get("work-list", [])
     if not works:
-        return f"No works found for ISWC: {iswc.upper()}"
+        return f"No works found for ISWC: {iswc}"
 
-    lines = [f"Found {len(works)} work(s) for ISWC {iswc.upper()}:"]
+    lines = [f"Found {len(works)} work(s) for ISWC {iswc}:"]
     for w in works:
         title = w.get("title", "Unknown")
         w_id = w.get("id")
