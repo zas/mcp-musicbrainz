@@ -27,6 +27,8 @@ musicbrainzngs.set_useragent(
 )
 
 
+TOOL_ANNOTATIONS = {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": True}
+
 ID_HINT: dict[str, str] = {
     "get_release_details": "If you have a release-group ID, use get_release_group_details or get_album_tracks instead.",
     "get_release_group_details": "If you have a release ID, use get_release_details instead.",
@@ -198,7 +200,7 @@ def _search_result_detail(entity_type: str, item: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
     """
@@ -244,7 +246,7 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def browse_entities(
     entity_type: str,
@@ -315,7 +317,7 @@ def browse_entities(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_artists(
     name: str,
@@ -358,7 +360,7 @@ def search_artists(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_releases(
     title: str | None = None,
@@ -415,7 +417,7 @@ def search_releases(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_recordings(
     title: str | None = None,
@@ -463,7 +465,7 @@ def search_recordings(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_release_groups(
     title: str | None = None,
@@ -508,7 +510,7 @@ def search_release_groups(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
@@ -568,7 +570,7 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_artist_discography(
     artist_id: str,
@@ -598,7 +600,7 @@ def get_artist_discography(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_release_details(release_id: str) -> str:
     """Get tracklist with durations, barcode, and label for a specific release.
@@ -645,7 +647,7 @@ def get_release_details(release_id: str) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     """
@@ -712,7 +714,7 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_album_tracks(release_group_id: str) -> str:
     """Fetches the tracklist with durations for a release group (album/EP/single).
@@ -735,7 +737,7 @@ def get_album_tracks(release_group_id: str) -> str:
     return header + "\n" + "\n".join(tracks)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
@@ -779,7 +781,7 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_work_details(work_id: str) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
@@ -835,7 +837,7 @@ def get_work_details(work_id: str) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_area_details(area_id: str, alias_limit: int = 10) -> str:
     """Get details about a geographic area (country, city).
@@ -870,7 +872,7 @@ def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10
     return aliases, tags
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_event_details(event_id: str, alias_limit: int = 10) -> str:
     """Get details about a music event (concert, festival, etc.).
@@ -900,7 +902,7 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
     """Get details about a musical instrument.
@@ -926,7 +928,7 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_place_details(place_id: str, alias_limit: int = 10) -> str:
     """Get details about a place (venue, studio, etc.).
@@ -957,7 +959,7 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_series_details(series_id: str, alias_limit: int = 10) -> str:
     """Get details about a series (release series, tour, etc.).
@@ -981,7 +983,7 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_label_details(label_id: str, alias_limit: int = 10) -> str:
     """Get details about a record label including type, area, tags, and URLs.
@@ -1018,7 +1020,7 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def lookup_by_barcode(barcode: str) -> str:
     """Finds a release by its UPC/EAN barcode."""
@@ -1035,7 +1037,7 @@ def lookup_by_barcode(barcode: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def lookup_recording_by_isrc(isrc: str) -> str:
     """
@@ -1063,7 +1065,7 @@ def lookup_recording_by_isrc(isrc: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def lookup_work_by_iswc(iswc: str) -> str:
     """
@@ -1126,7 +1128,7 @@ ALL_REL_INCLUDES = [
 ]
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_entity_relationships(entity_type: str, entity_id: str, include_rels: list[str] | None = None) -> str:
     """
@@ -1201,7 +1203,7 @@ def get_entity_relationships(entity_type: str, entity_id: str, include_rels: lis
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_cover_art_urls(release_id: str) -> str:
     """Get cover art image URLs for a specific release (edition)
@@ -1224,7 +1226,7 @@ def get_cover_art_urls(release_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_release_group_cover_art(release_group_id: str) -> str:
     """Get cover art image URLs for a release group (album/EP concept)
@@ -1257,7 +1259,7 @@ def get_release_group_cover_art(release_group_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
