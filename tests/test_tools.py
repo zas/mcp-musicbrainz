@@ -169,6 +169,11 @@ class TestSearchArtists:
             search_artists("Reverend Bizarre", offset=5)
         assert m.call_args[1]["offset"] == 5
 
+    def test_strict(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            search_artists("Reverend Bizarre", country="FI", strict=True)
+        assert m.call_args[1]["strict"] is True
+
 
 # ── search_releases ──────────────────────────────────────────────────────────
 
@@ -189,6 +194,11 @@ class TestSearchReleases:
         with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
             search_releases(title="In the Rectory", offset=10)
         assert m.call_args[1]["offset"] == 10
+
+    def test_strict(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(title="In the Rectory", artist="Reverend Bizarre", strict=True)
+        assert m.call_args[1]["strict"] is True
 
 
 # ── search_recordings ────────────────────────────────────────────────────────
@@ -215,6 +225,11 @@ class TestSearchRecordings:
         with mock.patch("musicbrainzngs.search_recordings", return_value=SEARCH_RECORDINGS_RESPONSE) as m:
             search_recordings(title="Burn in Hell!", offset=10)
         assert m.call_args[1]["offset"] == 10
+
+    def test_strict(self):
+        with mock.patch("musicbrainzngs.search_recordings", return_value=SEARCH_RECORDINGS_RESPONSE) as m:
+            search_recordings(title="Burn in Hell!", artist="Reverend Bizarre", strict=True)
+        assert m.call_args[1]["strict"] is True
 
 
 # ── search_release_groups ────────────────────────────────────────────────────
@@ -245,6 +260,11 @@ class TestSearchReleaseGroups:
         with mock.patch("musicbrainzngs.search_release_groups", return_value=SEARCH_RELEASE_GROUPS_RESPONSE) as m:
             search_release_groups(title="In the Rectory", offset=15)
         assert m.call_args[1]["offset"] == 15
+
+    def test_strict(self):
+        with mock.patch("musicbrainzngs.search_release_groups", return_value=SEARCH_RELEASE_GROUPS_RESPONSE) as m:
+            search_release_groups(title="In the Rectory", artist="Reverend Bizarre", strict=True)
+        assert m.call_args[1]["strict"] is True
 
 
 # ── get_artist_details ───────────────────────────────────────────────────────
