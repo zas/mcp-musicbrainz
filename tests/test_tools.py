@@ -294,6 +294,8 @@ class TestGetArtistDetails:
         assert "bandcamp" in res
         assert "In the Rectory" in res
         assert f"MBID: {RB_ARTIST_ID}" in res
+        assert "Disambiguation: Finnish doom metal band" in res
+        assert "Annotation:\nFormed in Loimaa, Finland." in res
 
     def test_alias_limit(self):
         with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE):
@@ -340,6 +342,8 @@ class TestGetReleaseDetails:
         assert f"release-group ID: {RECTORY_RG_ID}" in res
         assert "1. Burn in Hell! (8:52)" in res
         assert "6. Cirith Ungol (21:09)" in res
+        assert "Disambiguation: first press" in res
+        assert "Annotation:\nRecorded at Tico-Tico Studio." in res
 
     def test_error_hint(self):
         """Error message should suggest get_release_group_details."""
@@ -367,6 +371,9 @@ class TestGetRecordingDetails:
         assert "Composer: Dee Snider" in res
         assert f"work ID: {BURN_WORK_ID}" in res
         assert "Appears on (3 releases)" in res
+        # No disambiguation or annotation in mock data — should be absent
+        assert "Disambiguation:" not in res
+        assert "Annotation:" not in res
 
     def test_releases_limit(self):
         with mock.patch("musicbrainzngs.get_recording_by_id", return_value=GET_RECORDING_RESPONSE):
