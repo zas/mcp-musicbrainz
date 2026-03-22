@@ -21,7 +21,7 @@ cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 5
+CACHE_VERSION = 6
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -777,7 +777,8 @@ def get_album_tracks(release_group_id: MBID) -> str:
 @cached_tool()
 def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
-    A release group contains one or more releases (specific editions).
+    A release group contains one or more releases (specific editions),
+    each shown with its label, catalog number, country, and format.
     Use get_release_details for a specific edition's tracklist and barcode.
     Args:
         release_group_id: The MBID
@@ -785,7 +786,7 @@ def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) 
     """
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
-        includes=["artists", "releases", "tags", "ratings", "url-rels", "annotation"],
+        includes=["artists", "tags", "ratings", "url-rels", "annotation"],
     )
     rg = res["release-group"]
     tags = _fmt_tags(rg)
@@ -793,7 +794,27 @@ def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) 
     rtype = rg.get("type", "Unknown")
     date = rg.get("first-release-date", "Unknown")
 
-    releases = [f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}" for r in rg.get("release-list", [])]
+    # Fetch releases with label and media info for richer output
+    browse_res = musicbrainzngs.browse_releases(
+        release_group=release_group_id, includes=["labels", "media"], limit=min(releases_limit, 100)
+    )
+    release_list = browse_res.get("release-list", [])
+    release_count = browse_res.get("release-count", len(release_list))
+
+    releases = []
+    for r in release_list:
+        label_parts = []
+        for li in r.get("label-info-list", []):
+            lbl = li.get("label", {}).get("name")
+            cat = li.get("catalog-number")
+            if lbl:
+                label_parts.append(f"{lbl} ({cat})" if cat else lbl)
+        formats = [m.get("format", "") for m in r.get("medium-list", []) if m.get("format")]
+        info = [p for p in [r.get("date", ""), r.get("country", ""), "+".join(formats)] if p]
+        if label_parts:
+            info.append(", ".join(label_parts))
+        extra = f" ({' | '.join(info)})" if info else ""
+        releases.append(f"  - {r['title']}{extra} | release ID: {r['id']}")
 
     rating_str = _fmt_rating(rg)
 
@@ -807,11 +828,11 @@ def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) 
         f"MBID: {release_group_id}",
     ]
     _append_extras(parts, rg)
-    parts.append(f"\nReleases in this group ({len(releases)}):")
-    parts.extend(releases[:releases_limit])
-    if len(releases) > releases_limit:
+    parts.append(f"\nReleases in this group ({release_count}):")
+    parts.extend(releases)
+    if release_count > releases_limit:
         parts.append(
-            f"  ... and {len(releases) - releases_limit} more."
+            f"  ... and {release_count - len(releases)} more."
             f" Use browse_entities(entity_type='releases', linked_type='release_group',"
             f" linked_id='{release_group_id}') for the full list."
         )

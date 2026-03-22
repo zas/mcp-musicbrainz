@@ -16,7 +16,7 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and first 10 release groups |
 | `get_artist_discography` | Full paged discography (release groups) for an artist |
 | `get_release_details` | Release (specific edition) tracklist, barcode, label, and catalog number |
-| `get_release_group_details` | Release group (album concept) details with type, genres, and editions |
+| `get_release_group_details` | Release group (album concept) details with type, genres, and editions (with label, format, country) |
 | `get_recording_details` | Recording info with appearances, ISRCs, and genres |
 | `get_album_tracks` | Tracklist with durations and performer credits (instruments, vocals) for a release group |
 | `get_work_details` | Musical work details with composers and lyricists |
