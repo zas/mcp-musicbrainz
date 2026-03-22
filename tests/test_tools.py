@@ -601,6 +601,20 @@ class TestGetEntityRelationships:
         assert "Peter Vicar" in res
         assert "bandcamp" in res
 
+    def test_full_output(self):
+        with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RELS_RESPONSE):
+            res = get_entity_relationships("artist", RB_ARTIST_ID)
+        # Target MBIDs are included
+        assert "artist ID: 6b3ed1ba-ce18-422f-823e-bf39137f8d56" in res
+        assert "artist ID: 9b3f663b-2cba-4e7c-be94-f33bc56cf0c4" in res
+        # Date range shown when present
+        assert "[1999–2007]" in res
+        # No date range for Peter Vicar (no begin/end in mock data)
+        peter_line = [line for line in res.splitlines() if "Peter Vicar" in line][0]
+        assert "[" not in peter_line or "artist ID" in peter_line.split("[")[-1]
+        # URL rels use target as fallback (no entity dict)
+        assert "bandcamp" in res.lower()
+
     def test_custom_include_rels(self):
         with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RELS_RESPONSE) as m:
             get_entity_relationships("artist", RB_ARTIST_ID, include_rels=["label-rels", "place-rels"])
