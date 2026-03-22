@@ -21,7 +21,7 @@ cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 4
+CACHE_VERSION = 5
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -157,7 +157,9 @@ def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
         for t in medium.get("track-list", []):
             rec = t.get("recording", {})
             dur = _fmt_duration(rec.get("length"))
-            tracks.append(f"  {prefix}{t['number']}. {rec.get('title', '?')} ({dur})")
+            rec_id = rec.get("id", "")
+            rec_suffix = f" | recording ID: {rec_id}" if rec_id else ""
+            tracks.append(f"  {prefix}{t['number']}. {rec.get('title', '?')} ({dur}){rec_suffix}")
     return tracks
 
 
