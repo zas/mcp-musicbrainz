@@ -501,6 +501,9 @@ GET_ARTIST_RELS_RESPONSE = {
             {
                 "type": "member of band",
                 "direction": "backward",
+                "begin": "1999",
+                "end": "2007",
+                "ended": "true",
                 "attribute-list": ["bass guitar", "lead vocals", "original"],
                 "artist": {"id": "6b3ed1ba-ce18-422f-823e-bf39137f8d56", "name": "Albert Witchfinder"},
             },

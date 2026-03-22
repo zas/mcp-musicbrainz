@@ -1239,28 +1239,31 @@ def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: li
     lines = [f"Relationships for {entity_type} {entity_id}:"]
     found = False
 
+    # Entity keys that use "name" vs "title"
+    _TITLE_KEYS = {"work", "release", "release-group", "recording"}
+
     # Standardize relation list keys (artist-relation-list, url-relation-list, etc.)
     for key, value in entity.items():
         if key.endswith("-relation-list") and isinstance(value, list):
+            # Derive target entity type from key (e.g. "artist-relation-list" -> "artist")
+            rel_entity_type = key.removesuffix("-relation-list")
             for rel in value:
                 rtype = rel.get("type", "Unknown")
                 attrs = rel.get("attribute-list", [])
-                target = (
-                    rel.get("artist", {}).get("name")
-                    or rel.get("label", {}).get("name")
-                    or rel.get("area", {}).get("name")
-                    or rel.get("place", {}).get("name")
-                    or rel.get("event", {}).get("name")
-                    or rel.get("instrument", {}).get("name")
-                    or rel.get("series", {}).get("name")
-                    or rel.get("work", {}).get("title")
-                    or rel.get("release", {}).get("title")
-                    or rel.get("release-group", {}).get("title")
-                    or rel.get("recording", {}).get("title")
-                    or rel.get("target", "Unknown")
-                )
+                target_entity = rel.get(rel_entity_type, {})
+                name_key = "title" if rel_entity_type in _TITLE_KEYS else "name"
+                target_name = target_entity.get(name_key) or rel.get("target", "Unknown")
+                target_id = target_entity.get("id", "")
+
                 attrs_str = f" ({', '.join(attrs)})" if attrs else ""
-                lines.append(f"  - {rtype.capitalize()}{attrs_str}: {target}")
+                id_str = f" | {rel_entity_type} ID: {target_id}" if target_id else ""
+
+                # Date range (e.g. band membership periods)
+                begin = rel.get("begin", "")
+                end = rel.get("end", "")
+                date_str = f" [{begin or '?'}–{end or 'present'}]" if begin or end else ""
+
+                lines.append(f"  - {rtype.capitalize()}{attrs_str}: {target_name}{date_str}{id_str}")
                 found = True
 
     if not found:
