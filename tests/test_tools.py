@@ -37,6 +37,7 @@ from mcp_musicbrainz.server import (
 from tests.conftest import (
     BARCODE_LOOKUP_RESPONSE,
     BROWSE_RELEASE_GROUPS_RESPONSE,
+    BROWSE_RELEASES_FOR_RG_RESPONSE,
     BROWSE_RELEASES_RESPONSE,
     BROWSE_RELEASES_WITH_LABELS_RESPONSE,
     BURN_RECORDING_ID,
@@ -444,19 +445,34 @@ class TestGetAlbumTracks:
 
 class TestGetReleaseGroupDetails:
     def test_full_output(self):
-        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE):
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.browse_releases", return_value=BROWSE_RELEASES_FOR_RG_RESPONSE),
+        ):
             res = get_release_group_details(RECTORY_RG_ID)
         assert "Title: In the Rectory of the Bizarre Reverend" in res
         assert "Artist: Reverend Bizarre" in res
         assert "Type: Album" in res
         assert "doom metal (2)" in res
         assert "Rating: 4.25/5 (2 votes)" in res
-        assert "Releases in this group (2)" in res
+        assert "Releases in this group (5)" in res
+        # Label and format info from browse_releases
+        assert "Sinister Figure (SFGCD10)" in res
+        assert "CD" in res
+        assert "FI" in res
 
     def test_releases_limit(self):
-        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE):
+        release_list: list[dict[str, object]] = BROWSE_RELEASES_FOR_RG_RESPONSE["release-list"]  # type: ignore[assignment]
+        limited_browse = {
+            "release-list": release_list[:1],
+            "release-count": 5,
+        }
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.browse_releases", return_value=limited_browse),
+        ):
             res = get_release_group_details(RECTORY_RG_ID, releases_limit=1)
-        assert "... and 1 more" in res
+        assert "... and 4 more" in res
         assert "browse_entities" in res
 
 

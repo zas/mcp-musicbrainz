@@ -141,7 +141,6 @@ GET_RELEASE_GROUP_RESPONSE = {
                 "status": "Official",
                 "date": "2002-03-28",
                 "country": "FI",
-                "artist-credit-phrase": "Reverend Bizarre",
             },
             {
                 "id": "036abc08-d4c4-4e32-ab61-5358d7a67f40",
@@ -149,13 +148,42 @@ GET_RELEASE_GROUP_RESPONSE = {
                 "status": "Official",
                 "date": "2002",
                 "country": "RU",
-                "artist-credit-phrase": "Reverend Bizarre",
             },
         ],
         "release-count": 5,
         "tag-list": [{"count": "2", "name": "doom metal"}],
         "rating": {"votes-count": "2", "rating": "4.25"},
     }
+}
+
+# -- browse_releases for release group details --
+BROWSE_RELEASES_FOR_RG_RESPONSE = {
+    "release-list": [
+        {
+            "id": RECTORY_RELEASE_ID,
+            "title": "In the Rectory of the Bizarre Reverend",
+            "status": "Official",
+            "date": "2002-03-28",
+            "country": "FI",
+            "label-info-list": [
+                {
+                    "catalog-number": "SFGCD10",
+                    "label": {"id": SINISTER_LABEL_ID, "name": "Sinister Figure"},
+                }
+            ],
+            "medium-list": [{"position": "1", "format": "CD"}],
+        },
+        {
+            "id": "036abc08-d4c4-4e32-ab61-5358d7a67f40",
+            "title": "In the Rectory of the Bizarre Reverend",
+            "status": "Official",
+            "date": "2002",
+            "country": "RU",
+            "label-info-list": [],
+            "medium-list": [{"position": "1", "format": "CD"}],
+        },
+    ],
+    "release-count": 5,
 }
 
 # -- get_release_by_id response --
