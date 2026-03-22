@@ -65,7 +65,7 @@ class TestFormatTracks:
                 "track-list": [
                     {
                         "number": "1",
-                        "recording": {"title": "Song", "length": "180000"},
+                        "recording": {"id": "abc-123", "title": "Song", "length": "180000"},
                     }
                 ],
             }
@@ -73,6 +73,7 @@ class TestFormatTracks:
         result = _format_tracks(media)
         assert len(result) == 1
         assert "1. Song (3:00)" in result[0]
+        assert "recording ID: abc-123" in result[0]
         assert "[CD]" not in result[0]
 
     def test_multi_medium_has_prefix(self):
@@ -81,7 +82,7 @@ class TestFormatTracks:
             "track-list": [
                 {
                     "number": "1",
-                    "recording": {"title": "Track", "length": "60000"},
+                    "recording": {"id": "abc-123", "title": "Track", "length": "60000"},
                 }
             ],
         }
@@ -98,6 +99,17 @@ class TestFormatTracks:
         ]
         result = _format_tracks(media)
         assert "??:??" in result[0]
+
+    def test_missing_recording_id(self):
+        media = [
+            {
+                "track-list": [
+                    {"number": "1", "recording": {"title": "X", "length": "60000"}},
+                ]
+            }
+        ]
+        result = _format_tracks(media)
+        assert "recording ID" not in result[0]
 
 
 class TestFuncMaps:

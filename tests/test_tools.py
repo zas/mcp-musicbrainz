@@ -342,6 +342,7 @@ class TestGetReleaseDetails:
         assert f"release-group ID: {RECTORY_RG_ID}" in res
         assert "1. Burn in Hell! (8:52)" in res
         assert "6. Cirith Ungol (21:09)" in res
+        assert f"recording ID: {BURN_RECORDING_ID}" in res
         assert "Disambiguation: first press" in res
         assert "Annotation:\nRecorded at Tico-Tico Studio." in res
 
@@ -401,6 +402,7 @@ class TestGetAlbumTracks:
         assert "Burn in Hell!" in res
         assert "Cirith Ungol" in res
         assert f"release ID: {RECTORY_RELEASE_ID}" in res
+        assert f"recording ID: {BURN_RECORDING_ID}" in res
 
     def test_multi_release_hint(self):
         with (
