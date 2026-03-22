@@ -770,7 +770,22 @@ def get_album_tracks(release_group_id: MBID) -> str:
     header = f"Tracklist from release: {r.get('title', '?')} ({r.get('date', '?')}) | release ID: {release_id}"
     if len(releases) > 1:
         header += f"\n({len(releases)} releases available; use get_release_group_details to see all editions)"
-    return header + "\n" + "\n".join(tracks)
+    result = header + "\n" + "\n".join(tracks)
+    # Check if any recording had performer credits
+    has_performers = any(
+        rec.get("artist-relation-list")
+        for medium in r.get("medium-list", [])
+        for t in medium.get("track-list", [])
+        for rec in [t.get("recording", {})]
+    )
+    if not has_performers:
+        result += (
+            "\n\n(No per-track performer credits found in MusicBrainz for this release."
+            " Try get_recording_details on individual tracks, or"
+            f" get_entity_relationships(entity_type='release', entity_id='{release_id}',"
+            " include_rels=['artist-rels']) for release-level credits.)"
+        )
+    return result
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)

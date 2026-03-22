@@ -439,6 +439,42 @@ class TestGetAlbumTracks:
             res = get_album_tracks(RECTORY_RG_ID)
         assert "No releases found" in res
 
+    def test_no_performer_credits_hint(self):
+        """When no recordings have artist-relation-list, show a guidance hint."""
+        no_credits_release = {
+            "release": {
+                "id": RECTORY_RELEASE_ID,
+                "title": "Test Album",
+                "date": "2022",
+                "medium-list": [
+                    {
+                        "position": "1",
+                        "track-list": [
+                            {"number": "1", "recording": {"id": "rec-1", "title": "Track 1", "length": "180000"}},
+                        ],
+                    }
+                ],
+            }
+        }
+        single_rg = {"release-group": {"release-list": [{"id": RECTORY_RELEASE_ID}]}}
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=single_rg),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=no_credits_release),
+        ):
+            res = get_album_tracks(RECTORY_RG_ID)
+        assert "No per-track performer credits found" in res
+        assert "get_recording_details" in res
+        assert "get_entity_relationships" in res
+
+    def test_has_performers_no_hint(self):
+        """When recordings have performer credits, no hint is shown."""
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_RESPONSE),
+        ):
+            res = get_album_tracks(RECTORY_RG_ID)
+        assert "No per-track performer credits found" not in res
+
 
 # ── get_release_group_details ────────────────────────────────────────────────
 
