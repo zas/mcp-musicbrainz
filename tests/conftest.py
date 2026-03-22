@@ -192,7 +192,26 @@ GET_RELEASE_RESPONSE = {
                         "position": "1",
                         "number": "1",
                         "length": "532413",
-                        "recording": {"id": BURN_RECORDING_ID, "title": "Burn in Hell!", "length": "532413"},
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "532413",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["bass guitar"],
+                                    "artist": {"id": "aaa00001-0000-0000-0000-000000000001", "name": "Kimi Kärki"},
+                                },
+                                {
+                                    "type": "vocal",
+                                    "attribute-list": ["lead vocals"],
+                                    "artist": {
+                                        "id": "aaa00003-0000-0000-0000-000000000003",
+                                        "name": "Albert Witchfinder",
+                                    },
+                                },
+                            ],
+                        },
                     },
                     {
                         "id": "1d929982-20d3-3085-b8c2-a67e8ec01c53",
@@ -300,6 +319,23 @@ GET_RECORDING_RESPONSE = {
                         },
                     ],
                 },
+            },
+        ],
+        "artist-relation-list": [
+            {
+                "type": "instrument",
+                "attribute-list": ["bass guitar"],
+                "artist": {"id": "aaa00001-0000-0000-0000-000000000001", "name": "Kimi Kärki"},
+            },
+            {
+                "type": "instrument",
+                "attribute-list": ["drums (drum set)"],
+                "artist": {"id": "aaa00002-0000-0000-0000-000000000002", "name": "Earl of Void"},
+            },
+            {
+                "type": "vocal",
+                "attribute-list": ["lead vocals"],
+                "artist": {"id": "aaa00003-0000-0000-0000-000000000003", "name": "Albert Witchfinder"},
             },
         ],
     }

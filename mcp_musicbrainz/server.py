@@ -149,7 +149,18 @@ def _mb_error_message(err: musicbrainzngs.MusicBrainzError) -> str:
     return f"MusicBrainz error: {err}"
 
 
-def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
+def _format_performers(artist_relation_list: list[dict[str, Any]]) -> list[str]:
+    performers = []
+    for rel in artist_relation_list:
+        rtype = rel.get("type", "Unknown")
+        attrs = rel.get("attribute-list", [])
+        name = rel.get("artist", {}).get("name", "Unknown")
+        attrs_str = f" ({', '.join(attrs)})" if attrs else ""
+        performers.append(f"  - {rtype.capitalize()}{attrs_str}: {name}")
+    return performers
+
+
+def _format_tracks(medium_list: list[dict[str, Any]], include_performers: bool = False) -> list[str]:
     tracks = []
     for medium in medium_list:
         fmt = medium.get("format", "")
@@ -160,6 +171,8 @@ def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
             rec_id = rec.get("id", "")
             rec_suffix = f" | recording ID: {rec_id}" if rec_id else ""
             tracks.append(f"  {prefix}{t['number']}. {rec.get('title', '?')} ({dur}){rec_suffix}")
+            if include_performers:
+                tracks.extend(_format_performers(rec.get("artist-relation-list", [])))
     return tracks
 
 
@@ -660,8 +673,9 @@ def get_release_details(release_id: MBID) -> str:
 @cached_tool()
 def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
     """
-    Get recording details: artist, duration, ISRCs, tags, and which
-    releases (albums/singles) it appears on.
+    Get recording details: artist, duration, ISRCs, performer credits
+    (instruments, vocals), tags, and which releases (albums/singles) it appears on.
+    Use get_album_tracks to see performers for all tracks on an album at once.
     Args:
         recording_id: The MBID
         releases_limit: Max number of releases to show (default 25)
@@ -675,6 +689,7 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
             "tags",
             "ratings",
             "work-level-rels",
+            "artist-rels",
             "annotation",
         ],
     )
@@ -688,6 +703,9 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
     dur = _fmt_duration(rec.get("length"))
 
     rating_str = _fmt_rating(rec)
+
+    # Extract performer credits from artist relationships
+    performers = _format_performers(rec.get("artist-relation-list", []))
 
     # Extract linked works and their artist relationships (composers, lyricists)
     works = []
@@ -711,6 +729,9 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
         f"MBID: {recording_id}",
     ]
     _append_extras(parts, rec)
+    if performers:
+        parts.append(f"\nPerformers ({len(performers)}):")
+        parts.extend(performers)
     if works:
         parts.append(f"\nWorks ({len(works)}):")
         parts.extend(works)
@@ -728,7 +749,9 @@ def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_album_tracks(release_group_id: MBID) -> str:
-    """Fetches the tracklist with durations for a release group (album/EP/single).
+    """Fetches the tracklist with durations and performer credits for a release group
+    (album/EP/single). Each track lists the musicians and their instruments/roles.
+    Best tool for "who plays what on this album?" questions.
     Takes a release_group_id (NOT a release_id). For a specific release's tracklist,
     use get_release_details instead."""
     rg_result = musicbrainzngs.get_release_group_by_id(release_group_id, includes=["releases"])
@@ -737,9 +760,11 @@ def get_album_tracks(release_group_id: MBID) -> str:
         return "No releases found for this release group."
 
     release_id = releases[0]["id"]
-    release_details = musicbrainzngs.get_release_by_id(release_id, includes=["recordings"])
+    release_details = musicbrainzngs.get_release_by_id(
+        release_id, includes=["recordings", "artist-rels", "recording-level-rels"]
+    )
     r = release_details["release"]
-    tracks = _format_tracks(r.get("medium-list", []))
+    tracks = _format_tracks(r.get("medium-list", []), include_performers=True)
     if not tracks:
         return "No tracks found."
     header = f"Tracklist from release: {r.get('title', '?')} ({r.get('date', '?')}) | release ID: {release_id}"
@@ -1173,6 +1198,8 @@ def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: li
     """
     Get relationships for any entity type (e.g., band members, producers,
     recording studios, Wikipedia links).
+    For performer credits on recordings, prefer get_album_tracks (whole album)
+    or get_recording_details (single track) which include them directly.
     Args:
         entity_type: artist, release, release-group, recording, work, label, area,
                      place, event, instrument, series

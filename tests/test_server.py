@@ -7,6 +7,7 @@ from mcp_musicbrainz.server import (
     _fmt_duration,
     _fmt_rating,
     _fmt_tags,
+    _format_performers,
     _format_tracks,
     _mb_error_message,
     browse_entities,
@@ -110,6 +111,72 @@ class TestFormatTracks:
         ]
         result = _format_tracks(media)
         assert "recording ID" not in result[0]
+
+    def test_include_performers(self):
+        media = [
+            {
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": "abc-123",
+                            "title": "Song",
+                            "length": "180000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["guitar"],
+                                    "artist": {"name": "Alice"},
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = _format_tracks(media, include_performers=True)
+        assert len(result) == 2
+        assert "Instrument (guitar): Alice" in result[1]
+
+    def test_no_performers_by_default(self):
+        media = [
+            {
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": "abc-123",
+                            "title": "Song",
+                            "length": "180000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["guitar"],
+                                    "artist": {"name": "Alice"},
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = _format_tracks(media)
+        assert len(result) == 1
+
+
+class TestFormatPerformers:
+    def test_empty(self):
+        assert _format_performers([]) == []
+
+    def test_with_attributes(self):
+        rels = [{"type": "instrument", "attribute-list": ["trombone"], "artist": {"name": "Bob"}}]
+        result = _format_performers(rels)
+        assert result == ["  - Instrument (trombone): Bob"]
+
+    def test_without_attributes(self):
+        rels = [{"type": "performer", "artist": {"name": "Carol"}}]
+        result = _format_performers(rels)
+        assert result == ["  - Performer: Carol"]
 
 
 class TestFuncMaps:
