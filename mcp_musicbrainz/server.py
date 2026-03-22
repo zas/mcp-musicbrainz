@@ -388,6 +388,82 @@ def search_release_groups(
 
 @mcp.tool()
 @cached_tool()
+def search_recordings(
+    query: str,
+    artist: str | None = None,
+    release: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for specific audio recordings (songs/tracks).
+    Args:
+        query: Recording title
+        artist: Artist name
+        release: Release (album) title
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    kwargs = {"recording": query, "limit": limit, "offset": offset}
+    if artist:
+        kwargs["artist"] = artist
+    if release:
+        kwargs["release"] = release
+
+    result = musicbrainzngs.search_recordings(**kwargs)
+    items = result.get("recording-list", [])
+    if not items:
+        return "No recordings found."
+
+    lines = [f"Found {len(items)} recordings:"]
+    for i in items:
+        rtitle = i.get("title", "Unknown")
+        rartist = i.get("artist-credit-phrase", "Unknown")
+        rid = i["id"]
+        lines.append(f"- {rtitle} by {rartist} | recording ID: {rid}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
+def search_works(
+    query: str,
+    artist: str | None = None,
+    work_type: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for musical works (compositions/sheet music).
+    Args:
+        query: Work title
+        artist: Writer/Composer name
+        work_type: 'song', 'symphony', 'poem', etc.
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    kwargs = {"work": query, "limit": limit, "offset": offset}
+    if artist:
+        kwargs["artist"] = artist
+    if work_type:
+        kwargs["type"] = work_type
+
+    result = musicbrainzngs.search_works(**kwargs)
+    items = result.get("work-list", [])
+    if not items:
+        return "No works found."
+
+    lines = [f"Found {len(items)} works:"]
+    for i in items:
+        wtitle = i.get("title", "Unknown")
+        wtype = i.get("type", "Unknown")
+        wid = i["id"]
+        lines.append(f"- {wtitle} ({wtype}) | work ID: {wid}")
+    return "\n".join(lines)
+
+
+@mcp.tool()
+@cached_tool()
 def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,

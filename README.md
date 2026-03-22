@@ -28,6 +28,8 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_place_details` | Place info (venue, studio) with address, coordinates, aliases, and tags |
 | `get_series_details` | Series info (release series, tour) with type, aliases, and tags |
 | `get_release_group_cover_art` | Cover art image URLs for a release group (album concept) |
+| `search_recordings` | Search for specific audio recordings (songs/tracks) |
+| `search_works` | Search for musical works (compositions/sheet music) |
 
 ## Setup
 

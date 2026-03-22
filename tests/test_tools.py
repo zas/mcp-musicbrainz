@@ -179,6 +179,52 @@ class TestSearchReleases:
         assert "Please provide at least one search parameter" in res
 
 
+# ── search_recordings ─────────────────────────────────────────
+
+
+class TestSearchRecordings:
+    def test_basic_search(self):
+        mock_res = {
+            "recording-list": [{"title": "Stairway to Heaven", "artist-credit-phrase": "Led Zeppelin", "id": "rec-1"}]
+        }
+        with mock.patch("musicbrainzngs.search_recordings", return_value=mock_res):
+            from mcp_musicbrainz.server import search_recordings
+
+            res = search_recordings(query="Stairway to Heaven")
+        assert "Stairway to Heaven" in res
+        assert "Led Zeppelin" in res
+        assert "rec-1" in res
+
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_recordings", return_value={"recording-list": []}) as m:
+            from mcp_musicbrainz.server import search_recordings
+
+            search_recordings(query="Test", offset=5)
+        assert m.call_args[1]["offset"] == 5
+
+
+# ── search_works ─────────────────────────────────────────
+
+
+class TestSearchWorks:
+    def test_basic_search(self):
+        mock_res = {"work-list": [{"title": "Symphony No. 5", "type": "Symphony", "id": "work-1"}]}
+        with mock.patch("musicbrainzngs.search_works", return_value=mock_res):
+            from mcp_musicbrainz.server import search_works
+
+            res = search_works(query="Symphony No. 5")
+        assert "Symphony No. 5" in res
+        assert "Symphony" in res
+        assert "work-1" in res
+
+    def test_with_offset(self):
+        with mock.patch("musicbrainzngs.search_works", return_value={"work-list": []}) as m:
+            from mcp_musicbrainz.server import search_works
+
+            search_works(query="Test", offset=10)
+        assert m.call_args[1]["offset"] == 10
+
+
 # ── search_release_groups ────────────────────────────────────────────────────
 
 
