@@ -367,6 +367,10 @@ class TestGetRecordingDetails:
         assert "FISFS0404002" in res
         assert "doom metal (2)" in res
         assert "Rating: 4.25/5 (2 votes)" in res
+        assert "Performers (3):" in res
+        assert "Instrument (bass guitar): Kimi Kärki" in res
+        assert "Instrument (drums (drum set)): Earl of Void" in res
+        assert "Vocal (lead vocals): Albert Witchfinder" in res
         assert "Works (1):" in res
         assert "Burn in Hell" in res
         assert "Composer: Dee Snider" in res
@@ -403,6 +407,8 @@ class TestGetAlbumTracks:
         assert "Cirith Ungol" in res
         assert f"release ID: {RECTORY_RELEASE_ID}" in res
         assert f"recording ID: {BURN_RECORDING_ID}" in res
+        assert "Instrument (bass guitar): Kimi Kärki" in res
+        assert "Vocal (lead vocals): Albert Witchfinder" in res
 
     def test_multi_release_hint(self):
         with (
