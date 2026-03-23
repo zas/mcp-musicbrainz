@@ -6,12 +6,18 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 
 | Tool | Description |
 |---|---|
-| `search_entities` | Search for any MusicBrainz entity using Lucene syntax. Primary entry point |
-| `search_entities_fuzzy` | Typo-tolerant search with automatic exact-first fallback |
 | `search_artists` | Search for artists with filters (country, type, gender) |
-| `search_releases` | Search for releases with filters (title, artist, label, barcode) |
+| `search_releases` | Search for releases with filters (title, artist, label, barcode, catalog number, format) |
 | `search_recordings` | Search for recordings with filters (title, artist, release, ISRC) |
 | `search_release_groups` | Search for release groups (albums/EPs/singles) with filters (artist, type) |
+| `search_labels` | Search for record labels with filters (type, country) |
+| `search_works` | Search for musical works/compositions with filters (artist, type) |
+| `search_areas` | Search for geographic areas with filters (type) |
+| `search_events` | Search for music events with filters (artist, type) |
+| `search_instruments` | Search for musical instruments with filters (type) |
+| `search_places` | Search for places (venues, studios) with filters (type, area) |
+| `search_series` | Search for series (release series, tours) with filters (type) |
+| `search_entities_fuzzy` | Typo-tolerant search with automatic exact-first fallback |
 | `browse_entities` | Browse entities linked to another entity with paging and optional includes (e.g. all releases by an artist with label info) |
 | `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and first 10 release groups |
 | `get_artist_discography` | Full paged discography (release groups) for an artist |
@@ -22,16 +28,15 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `get_work_details` | Musical work details with composers and lyricists |
 | `get_area_details` | Geographic area info (country, city) with aliases |
 | `get_label_details` | Label info with type, area, genres, and URLs |
-| `get_entity_relationships` | Relationships for any entity type (band members, producers, etc.) |
-| `get_cover_art_urls` | Cover art image URLs from the Cover Art Archive |
-| `lookup_by_barcode` | Find a release by UPC/EAN barcode |
-| `lookup_recording_by_isrc` | Translate a commercial ISRC (Spotify/Apple) to a MusicBrainz recording |
-| `lookup_work_by_iswc` | Translate a publisher's ISWC to a MusicBrainz work (composition) |
 | `get_event_details` | Event info (concert, festival) with date, time, aliases, and tags |
 | `get_instrument_details` | Musical instrument info with type, description, aliases, and tags |
 | `get_place_details` | Place info (venue, studio) with address, coordinates, aliases, and tags |
 | `get_series_details` | Series info (release series, tour) with type, aliases, and tags |
+| `get_entity_relationships` | Relationships for any entity type (band members, producers, etc.) |
+| `get_cover_art_urls` | Cover art image URLs from the Cover Art Archive |
 | `get_release_group_cover_art` | Cover art image URLs for a release group (album concept) |
+| `lookup_recording_by_isrc` | Translate a commercial ISRC (Spotify/Apple) to a MusicBrainz recording |
+| `lookup_work_by_iswc` | Translate a publisher's ISWC to a MusicBrainz work (composition) |
 
 ## Setup
 
