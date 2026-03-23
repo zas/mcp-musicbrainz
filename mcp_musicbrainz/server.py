@@ -341,6 +341,8 @@ def search_artists(
     country: str | None = None,
     artist_type: str | None = None,
     gender: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 5,
     offset: int = 0,
     strict: bool = False,
@@ -352,6 +354,12 @@ def search_artists(
         country: ISO 3166-1 alpha-2 country code
         artist_type: 'person', 'group', 'orchestra', 'choir', 'character', 'other'
         gender: 'male', 'female', 'other', 'not applicable'
+        begin_date: Artist begin date (formation for groups, birth for persons).
+            Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an artist was created, formed, founded, or born.
+        end_date: Artist end date (dissolution for groups, death for persons).
+            Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an artist was dissolved, disbanded, or died.
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
         strict: If True, all filters must match (default False for fuzzy ranking)
@@ -363,6 +371,10 @@ def search_artists(
         kwargs["type"] = artist_type
     if gender:
         kwargs["gender"] = gender
+    if begin_date:
+        kwargs["begin"] = begin_date
+    if end_date:
+        kwargs["end"] = end_date
 
     result = musicbrainzngs.search_artists(**kwargs)
     items = result.get("artist-list", [])
@@ -535,7 +547,13 @@ def search_release_groups(
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_labels(
-    name: str, label_type: str | None = None, country: str | None = None, limit: int = 5, offset: int = 0
+    name: str,
+    label_type: str | None = None,
+    country: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
 ) -> str:
     """
     Search for record labels.
@@ -543,6 +561,10 @@ def search_labels(
         name: Label name
         label_type: e.g. 'Original Production', 'Distributor', 'Holding', 'Reissue Production'
         country: ISO 3166-1 alpha-2 country code
+        begin_date: Label begin date (founding). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a label was founded or started.
+        end_date: Label end date (closing). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a label was closed or shut down.
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
     """
@@ -551,6 +573,10 @@ def search_labels(
         parts.append(f'type:"{label_type}"')
     if country:
         parts.append(f"country:{country}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
     return _search_entities("label", " AND ".join(parts), limit=limit, offset=offset)
 
 
@@ -578,25 +604,46 @@ def search_works(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_areas(name: str, area_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
+def search_areas(
+    name: str,
+    area_type: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
     """
     Search for geographic areas (countries, cities, etc.).
     Args:
         name: Area name
         area_type: e.g. 'Country', 'City', 'Subdivision', 'Municipality'
+        begin_date: Area begin date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an area was established.
+        end_date: Area end date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an area ceased to exist.
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"area:{name}"]
     if area_type:
         parts.append(f"type:{area_type}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
     return _search_entities("area", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_events(
-    name: str, artist: str | None = None, event_type: str | None = None, limit: int = 5, offset: int = 0
+    name: str,
+    artist: str | None = None,
+    event_type: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
 ) -> str:
     """
     Search for music events (concerts, festivals, etc.).
@@ -604,6 +651,10 @@ def search_events(
         name: Event name
         artist: Artist related to the event
         event_type: e.g. 'Concert', 'Festival', 'Convention/Expo'
+        begin_date: Event begin date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an event started or took place.
+        end_date: Event end date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an event ended.
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
     """
@@ -612,6 +663,10 @@ def search_events(
         parts.append(f"artist:{artist}")
     if event_type:
         parts.append(f"type:{event_type}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
     return _search_entities("event", " AND ".join(parts), limit=limit, offset=offset)
 
 
@@ -635,7 +690,13 @@ def search_instruments(name: str, instrument_type: str | None = None, limit: int
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_places(
-    name: str, place_type: str | None = None, area: str | None = None, limit: int = 5, offset: int = 0
+    name: str,
+    place_type: str | None = None,
+    area: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
 ) -> str:
     """
     Search for places (venues, studios, etc.).
@@ -643,6 +704,10 @@ def search_places(
         name: Place name
         place_type: e.g. 'Studio', 'Venue', 'Religious building'
         area: Area name the place is in
+        begin_date: Place begin date (opening). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a place opened or was established.
+        end_date: Place end date (closing). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a place closed.
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
     """
@@ -651,6 +716,10 @@ def search_places(
         parts.append(f"type:{place_type}")
     if area:
         parts.append(f"area:{area}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
     return _search_entities("place", " AND ".join(parts), limit=limit, offset=offset)
 
 

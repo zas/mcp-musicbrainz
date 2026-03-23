@@ -27,8 +27,12 @@ from mcp_musicbrainz.server import (
     get_release_group_details,
     get_series_details,
     get_work_details,
+    search_areas,
     search_artists,
     search_entities_fuzzy,
+    search_events,
+    search_labels,
+    search_places,
     search_recordings,
     search_release_groups,
     search_releases,
@@ -183,6 +187,81 @@ class TestSearchArtists:
         with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
             search_artists("Reverend Bizarre", country="FI", strict=True)
         assert m.call_args[1]["strict"] is True
+
+    def test_with_begin_date(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            search_artists("Reverend Bizarre", begin_date="1999")
+        assert m.call_args[1]["begin"] == "1999"
+
+    def test_with_end_date(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            search_artists("Reverend Bizarre", end_date="2007")
+        assert m.call_args[1]["end"] == "2007"
+
+
+# ── search_labels / search_areas / search_events / search_places (begin/end) ─
+
+
+EMPTY_AREA_RESPONSE = {"area-list": []}
+EMPTY_LABEL_RESPONSE = {"label-list": []}
+EMPTY_EVENT_RESPONSE = {"event-list": []}
+EMPTY_PLACE_RESPONSE = {"place-list": []}
+
+
+class TestSearchLabelsBeginEnd:
+    def test_with_begin_date(self):
+        m = mock.Mock(return_value=EMPTY_LABEL_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"label": m}):
+            search_labels("test", begin_date="2020")
+        assert "begin:2020" in m.call_args[1]["query"]
+
+    def test_with_end_date(self):
+        m = mock.Mock(return_value=EMPTY_LABEL_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"label": m}):
+            search_labels("test", end_date="2023")
+        assert "end:2023" in m.call_args[1]["query"]
+
+
+class TestSearchAreasBeginEnd:
+    def test_with_begin_date(self):
+        m = mock.Mock(return_value=EMPTY_AREA_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"area": m}):
+            search_areas("test", begin_date="1990")
+        assert "begin:1990" in m.call_args[1]["query"]
+
+    def test_with_end_date(self):
+        m = mock.Mock(return_value=EMPTY_AREA_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"area": m}):
+            search_areas("test", end_date="2000")
+        assert "end:2000" in m.call_args[1]["query"]
+
+
+class TestSearchEventsBeginEnd:
+    def test_with_begin_date(self):
+        m = mock.Mock(return_value=EMPTY_EVENT_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"event": m}):
+            search_events("test", begin_date="2024-06-15")
+        assert "begin:2024-06-15" in m.call_args[1]["query"]
+
+    def test_with_end_date(self):
+        m = mock.Mock(return_value=EMPTY_EVENT_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"event": m}):
+            search_events("test", end_date="2024-06-17")
+        assert "end:2024-06-17" in m.call_args[1]["query"]
+
+
+class TestSearchPlacesBeginEnd:
+    def test_with_begin_date(self):
+        m = mock.Mock(return_value=EMPTY_PLACE_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"place": m}):
+            search_places("test", begin_date="1971")
+        assert "begin:1971" in m.call_args[1]["query"]
+
+    def test_with_end_date(self):
+        m = mock.Mock(return_value=EMPTY_PLACE_RESPONSE)
+        with mock.patch.dict("mcp_musicbrainz.server.SEARCH_FUNCS", {"place": m}):
+            search_places("test", end_date="1999-10")
+        assert "end:1999-10" in m.call_args[1]["query"]
 
 
 # ── search_releases ──────────────────────────────────────────────────────────
