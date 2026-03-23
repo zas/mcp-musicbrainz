@@ -337,10 +337,11 @@ def browse_entities(
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_artists(
-    name: str,
+    name: str | None = None,
     country: str | None = None,
     artist_type: str | None = None,
     gender: str | None = None,
+    area: str | None = None,
     begin_date: str | None = None,
     end_date: str | None = None,
     limit: int = 5,
@@ -349,11 +350,15 @@ def search_artists(
 ) -> str:
     """
     Search for artists with specific filters.
+    Always use strict=True when searching by filters without a name to get exact matches.
+    Without strict mode, filter-only queries return fuzzy-ranked results that may not match the filters.
+    Keep limit low (default 5) to avoid excessive queries. Do not use this tool to dump large result sets.
     Args:
         name: Artist name
         country: ISO 3166-1 alpha-2 country code
         artist_type: 'person', 'group', 'orchestra', 'choir', 'character', 'other'
         gender: 'male', 'female', 'other', 'not applicable'
+        area: Area name the artist is from (e.g. city or region)
         begin_date: Artist begin date (formation for groups, birth for persons).
             Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
             Use when the user asks when an artist was created, formed, founded, or born.
@@ -364,17 +369,24 @@ def search_artists(
         offset: Number of results to skip for pagination (default 0)
         strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"artist": name, "limit": limit, "offset": offset, "strict": strict}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
+    if name:
+        kwargs["artist"] = name
     if country:
         kwargs["country"] = country
     if artist_type:
         kwargs["type"] = artist_type
     if gender:
         kwargs["gender"] = gender
+    if area:
+        kwargs["area"] = area
     if begin_date:
         kwargs["begin"] = begin_date
     if end_date:
         kwargs["end"] = end_date
+
+    if not any((name, country, artist_type, gender, area, begin_date, end_date)):
+        return "Please provide at least one search parameter."
 
     result = musicbrainzngs.search_artists(**kwargs)
     items = result.get("artist-list", [])
