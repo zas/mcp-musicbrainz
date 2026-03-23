@@ -646,15 +646,17 @@ def search_series(name: str, series_type: str | None = None, limit: int = 5, off
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit: int = 10) -> str:
+def get_artist_details(
+    artist_id: MBID, alias_limit: int = 10, discography_limit: int = 10, discography_offset: int = 0
+) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,
     and their discography (Release Groups) with MBIDs.
-    Shows first release groups; use get_artist_discography for the full paged list.
     Args:
         artist_id: The MBID
         alias_limit: Max number of aliases to show (default 10)
         discography_limit: Max number of release groups to show (default 10)
+        discography_offset: Paging offset for the discography (default 0)
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -662,7 +664,6 @@ def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit
             "aliases",
             "tags",
             "ratings",
-            "release-groups",
             "url-rels",
             "annotation",
         ],
@@ -671,10 +672,13 @@ def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit
     aliases, tags = _extract_aliases_and_tags(a, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
-    rg_list = sorted(
-        a.get("release-group-list", []),
-        key=lambda rg: rg.get("first-release-date", "9999"),
+    rg_res = musicbrainzngs.browse_release_groups(
+        artist=artist_id,
+        limit=min(discography_limit, 100),
+        offset=discography_offset,
     )
+    rg_list = rg_res.get("release-group-list", [])
+    rg_count = rg_res.get("release-group-count", len(rg_list))
     albums = []
     for rg in rg_list:
         rtype = rg.get("type", "Unknown")
@@ -699,41 +703,15 @@ def get_artist_details(artist_id: MBID, alias_limit: int = 10, discography_limit
     _append_extras(parts, a)
     if urls:
         parts.append(f"URLs:\n{urls}")
-    parts.append(
-        f"\nDISCOGRAPHY (Showing first {discography_limit} of {len(rg_list)} release groups. "
-        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:discography_limit])
+
+    showing = f"{discography_offset + 1}–{discography_offset + len(rg_list)}" if rg_list else "0"
+    hint = (
+        " Increase discography_limit or use discography_offset to page."
+        if rg_count > discography_offset + len(rg_list)
+        else ""
     )
+    parts.append(f"\nDISCOGRAPHY (Showing {showing} of {rg_count} release groups.{hint})\n" + "\n".join(albums))
     return "\n".join(parts)
-
-
-@mcp.tool(annotations=TOOL_ANNOTATIONS)
-@cached_tool()
-def get_artist_discography(
-    artist_id: MBID,
-    limit: int = 25,
-    offset: int = 0,
-) -> str:
-    """
-    Get a paged discography (release groups) for an artist.
-    Use this for complete discographies; get_artist_details only shows the first 10.
-    Args:
-        artist_id: The MBID
-        limit: Max results (default 25)
-        offset: Paging offset
-    """
-    res = musicbrainzngs.browse_release_groups(
-        artist=artist_id,
-        limit=min(limit, 100),
-        offset=offset,
-    )
-    items = res.get("release-group-list", [])
-    count = res.get("release-group-count", len(items))
-    lines = [f"Discography for artist {artist_id} (Showing {len(items)} of {count}):"]
-    for i in items:
-        rtype = i.get("type", "Unknown")
-        date = i.get("first-release-date", "????")
-        lines.append(f"- {i['title']} ({date}) [{rtype}] | release-group ID: {i['id']}")
-    return "\n".join(lines)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)

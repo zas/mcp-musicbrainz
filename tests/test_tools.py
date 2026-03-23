@@ -14,7 +14,6 @@ from mcp_musicbrainz.server import (
     get_album_tracks,
     get_area_details,
     get_artist_details,
-    get_artist_discography,
     get_cover_art_urls,
     get_entity_relationships,
     get_event_details,
@@ -302,8 +301,14 @@ class TestSearchReleaseGroups:
 
 
 class TestGetArtistDetails:
+    def _mock_both(self):
+        return (
+            mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE),
+            mock.patch("musicbrainzngs.browse_release_groups", return_value=BROWSE_RELEASE_GROUPS_RESPONSE),
+        )
+
     def test_full_output(self):
-        with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE):
+        with self._mock_both()[0], self._mock_both()[1]:
             res = get_artist_details(RB_ARTIST_ID)
         assert "Name: Reverend Bizarre" in res
         assert "Type: Group" in res
@@ -319,7 +324,7 @@ class TestGetArtistDetails:
         assert "Annotation:\nFormed in Loimaa, Finland." in res
 
     def test_alias_limit(self):
-        with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE):
+        with self._mock_both()[0], self._mock_both()[1]:
             res = get_artist_details(RB_ARTIST_ID, alias_limit=2)
         # Only 2 of 4 aliases should appear
         assert "Reverand Bizarre" in res
@@ -327,23 +332,12 @@ class TestGetArtistDetails:
         assert "Reverend Bizzarre" not in res
 
     def test_discography_limit(self):
-        with mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE):
-            res = get_artist_details(RB_ARTIST_ID, discography_limit=1)
-        assert "In the Rectory" in res
-        assert "II: Crush the Insects" not in res
-
-
-# ── get_artist_discography ───────────────────────────────────────────────────
-
-
-class TestGetArtistDiscography:
-    def test_paged_output(self):
-        with mock.patch("musicbrainzngs.browse_release_groups", return_value=BROWSE_RELEASE_GROUPS_RESPONSE):
-            res = get_artist_discography(RB_ARTIST_ID, limit=3)
-        assert "Showing 3 of 28" in res
-        assert "In the Rectory" in res
-        assert "II: Crush the Insects" in res
-        assert "[Album]" in res
+        with (
+            mock.patch("musicbrainzngs.get_artist_by_id", return_value=GET_ARTIST_RESPONSE),
+            mock.patch("musicbrainzngs.browse_release_groups", return_value=BROWSE_RELEASE_GROUPS_RESPONSE) as m,
+        ):
+            get_artist_details(RB_ARTIST_ID, discography_limit=1)
+        assert m.call_args[1]["limit"] == 1
 
 
 # ── get_release_details ──────────────────────────────────────────────────────
