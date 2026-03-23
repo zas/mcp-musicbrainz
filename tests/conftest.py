@@ -488,6 +488,15 @@ SEARCH_RELEASES_RESPONSE = {
             "title": "In the Rectory of the Bizarre Reverend",
             "date": "2002-03-28",
             "artist-credit-phrase": "Reverend Bizarre",
+            "label-info-list": [
+                {
+                    "catalog-number": "SY-002",
+                    "label": {"name": "Sinister Figure"},
+                },
+            ],
+            "medium-list": [
+                {"format": '12" Vinyl'},
+            ],
         },
     ],
     "release-count": 1,
