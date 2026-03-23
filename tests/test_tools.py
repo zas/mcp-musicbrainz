@@ -9,6 +9,7 @@ import unittest.mock as mock
 import musicbrainzngs
 
 from mcp_musicbrainz.server import (
+    _search_entities,
     browse_entities,
     get_album_tracks,
     get_area_details,
@@ -27,7 +28,6 @@ from mcp_musicbrainz.server import (
     get_series_details,
     get_work_details,
     search_artists,
-    search_entities,
     search_entities_fuzzy,
     search_recordings,
     search_release_groups,
@@ -73,20 +73,20 @@ class TestSearchEntities:
         with mock.patch.dict(
             "mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value=SEARCH_ARTISTS_RESPONSE)}
         ):
-            res = search_entities("artist", "Reverend Bizarre", limit=2)
+            res = _search_entities("artist", "Reverend Bizarre", limit=2)
         assert "Found 2 results" in res
         assert "Reverend Bizarre (Finnish doom metal band)" in res
         assert f"artist ID: {RB_ARTIST_ID}" in res
 
     def test_invalid_entity_type(self):
-        res = search_entities("bogus", "test")
+        res = _search_entities("bogus", "test")
         assert "Invalid entity type" in res
 
     def test_empty_results(self):
         with mock.patch.dict(
             "mcp_musicbrainz.server.SEARCH_FUNCS", {"artist": mock.Mock(return_value={"artist-list": []})}
         ):
-            res = search_entities("artist", "nonexistent")
+            res = _search_entities("artist", "nonexistent")
         assert "Found 0 results" in res
 
 

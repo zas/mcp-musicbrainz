@@ -10,8 +10,8 @@ from mcp_musicbrainz.server import (
     _format_performers,
     _format_tracks,
     _mb_error_message,
+    _search_entities,
     browse_entities,
-    search_entities,
 )
 
 
@@ -197,7 +197,7 @@ class TestFuncMaps:
 
 class TestInputValidation:
     def test_search_invalid_entity_type(self):
-        result = search_entities("bogus", "test")
+        result = _search_entities("bogus", "test")
         assert "Invalid entity type" in result
         assert "bogus" in result
 
