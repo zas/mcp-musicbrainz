@@ -11,6 +11,7 @@ import musicbrainzngs
 from mcp_musicbrainz.server import (
     _search_entities,
     browse_entities,
+    get_album_recording_rels,
     get_album_tracks,
     get_area_details,
     get_artist_details,
@@ -51,6 +52,8 @@ from tests.conftest import (
     GET_RECORDING_RESPONSE,
     GET_RELEASE_GROUP_RESPONSE,
     GET_RELEASE_RESPONSE,
+    GET_RELEASE_WITH_RECORDING_ARTIST_RELS,
+    GET_RELEASE_WITH_RECORDING_PLACE_RELS,
     GET_SERIES_RESPONSE,
     GET_WORK_RESPONSE,
     RB_ARTIST_ID,
@@ -488,6 +491,78 @@ class TestGetAlbumTracks:
         ):
             res = get_album_tracks(RECTORY_RG_ID)
         assert "No per-track performer credits found" not in res
+
+
+# ── get_album_recording_rels ─────────────────────────────────────────────────
+
+
+class TestGetAlbumRecordingRels:
+    def test_place_rels(self):
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_WITH_RECORDING_PLACE_RELS),
+        ):
+            res = get_album_recording_rels(RECTORY_RG_ID, "place")
+        assert "Tico-Tico Studio" in res
+        assert "Finnvox Studios" in res
+        assert "Recorded at" in res
+        assert "Mixed at" in res
+        assert "place ID: place-studio-1" in res
+        assert "2001-10" in res
+        assert f"release ID: {RECTORY_RELEASE_ID}" in res
+
+    def test_artist_rels(self):
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_WITH_RECORDING_ARTIST_RELS),
+        ):
+            res = get_album_recording_rels(RECTORY_RG_ID, "artist")
+        assert "Anssi Kippo" in res
+        assert "Engineer" in res
+        assert "artist ID: artist-eng-1" in res
+
+    def test_deduplication(self):
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=GET_RELEASE_GROUP_RESPONSE),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=GET_RELEASE_WITH_RECORDING_PLACE_RELS),
+        ):
+            res = get_album_recording_rels(RECTORY_RG_ID, "place")
+        assert res.count("Tico-Tico Studio") == 1
+
+    def test_no_rels(self):
+        no_rels_release = {
+            "release": {
+                "id": RECTORY_RELEASE_ID,
+                "title": "Test",
+                "date": "2022",
+                "medium-list": [
+                    {
+                        "position": "1",
+                        "track-list": [
+                            {"number": "1", "recording": {"id": "rec-1", "title": "Track 1", "length": "180000"}},
+                        ],
+                    }
+                ],
+            }
+        }
+        single_rg = {"release-group": {"release-list": [{"id": RECTORY_RELEASE_ID}]}}
+        with (
+            mock.patch("musicbrainzngs.get_release_group_by_id", return_value=single_rg),
+            mock.patch("musicbrainzngs.get_release_by_id", return_value=no_rels_release),
+        ):
+            res = get_album_recording_rels(RECTORY_RG_ID, "place")
+        assert "No place relationships found" in res
+        assert "get_entity_relationships" in res
+
+    def test_no_releases(self):
+        empty_rg = {"release-group": {"release-list": []}}
+        with mock.patch("musicbrainzngs.get_release_group_by_id", return_value=empty_rg):
+            res = get_album_recording_rels(RECTORY_RG_ID, "place")
+        assert "No releases found" in res
+
+    def test_invalid_rel_type(self):
+        res = get_album_recording_rels(RECTORY_RG_ID, "invalid")
+        assert "Invalid rel_type" in res
 
 
 # ── get_release_group_details ────────────────────────────────────────────────

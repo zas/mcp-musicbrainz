@@ -641,6 +641,88 @@ GET_SERIES_RESPONSE = {
     }
 }
 
+GET_RELEASE_WITH_RECORDING_PLACE_RELS = {
+    "release": {
+        "id": RECTORY_RELEASE_ID,
+        "title": "In the Rectory of the Bizarre Reverend",
+        "date": "2002-06-24",
+        "medium-list": [
+            {
+                "position": "1",
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "420000",
+                            "place-relation-list": [
+                                {
+                                    "type": "recorded at",
+                                    "place": {"id": "place-studio-1", "name": "Tico-Tico Studio"},
+                                    "begin": "2001-10",
+                                    "end": "2001-11",
+                                },
+                                {
+                                    "type": "mixed at",
+                                    "place": {"id": "place-studio-2", "name": "Finnvox Studios"},
+                                    "begin": "2002-01",
+                                    "end": "2002-01",
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        "number": "2",
+                        "recording": {
+                            "id": "rec-2",
+                            "title": "The Devil Rides Out",
+                            "length": "300000",
+                            "place-relation-list": [
+                                {
+                                    "type": "recorded at",
+                                    "place": {"id": "place-studio-1", "name": "Tico-Tico Studio"},
+                                    "begin": "2001-10",
+                                    "end": "2001-11",
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+}
+
+GET_RELEASE_WITH_RECORDING_ARTIST_RELS = {
+    "release": {
+        "id": RECTORY_RELEASE_ID,
+        "title": "In the Rectory of the Bizarre Reverend",
+        "date": "2002-06-24",
+        "medium-list": [
+            {
+                "position": "1",
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "420000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "engineer",
+                                    "artist": {"id": "artist-eng-1", "name": "Anssi Kippo"},
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+}
+
 
 class MockCache(dict):
     """In-memory cache replacement for tests."""

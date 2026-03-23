@@ -21,7 +21,7 @@ cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 6
+CACHE_VERSION = 8
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -888,6 +888,79 @@ def get_album_tracks(release_group_id: MBID) -> str:
             " include_rels=['artist-rels']) for release-level credits.)"
         )
     return result
+
+
+RECORDING_REL_TYPES = {"artist", "place", "work", "url", "label", "area"}
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def get_album_recording_rels(release_group_id: MBID, rel_type: str) -> str:
+    """Get recording-level relationships of a given type for all tracks on an album in one call.
+    Returns deduplicated entities with relationship types and date ranges.
+    Use this instead of calling get_entity_relationships on each recording individually.
+    Takes a release_group_id (NOT a release_id).
+
+    Common queries:
+      - "Which studios were used?" → rel_type='place'
+      - "Who engineered/produced/mixed?" → rel_type='artist'
+      - "What compositions are these recordings of?" → rel_type='work'
+
+    Args:
+        release_group_id: The MBID of the release group (album concept)
+        rel_type: Relationship target type: 'artist', 'place', 'work', 'url', 'label', 'area'
+    """
+    if rel_type not in RECORDING_REL_TYPES:
+        return f"Invalid rel_type '{rel_type}'. Must be one of: {', '.join(sorted(RECORDING_REL_TYPES))}"
+
+    rg_result = musicbrainzngs.get_release_group_by_id(release_group_id, includes=["releases"])
+    releases = rg_result["release-group"].get("release-list", [])
+    if not releases:
+        return "No releases found for this release group."
+
+    release_id = releases[0]["id"]
+    release_details = musicbrainzngs.get_release_by_id(
+        release_id, includes=["recordings", "recording-level-rels", f"{rel_type}-rels"]
+    )
+    r = release_details["release"]
+
+    # Collect unique (rel_type_str, entity_name, entity_id) with date ranges
+    entities: dict[tuple[str, str, str], list[str]] = {}
+    rel_list_key = f"{rel_type}-relation-list"
+    for medium in r.get("medium-list", []):
+        for t in medium.get("track-list", []):
+            rec = t.get("recording", {})
+            for rel in rec.get(rel_list_key, []):
+                rtype = rel.get("type", "unknown")
+                entity = rel.get(rel_type, {})
+                name = entity.get("name", entity.get("title", "Unknown"))
+                eid = entity.get("id", "")
+                begin = rel.get("begin", "")
+                end = rel.get("end", "")
+                date_str = f"{begin or '?'}–{end or '?'}" if begin or end else ""
+                key = (rtype, name, eid)
+                if date_str and date_str not in entities.get(key, []):
+                    entities.setdefault(key, []).append(date_str)
+                else:
+                    entities.setdefault(key, [])
+
+    if not entities:
+        return (
+            f"No {rel_type} relationships found on recordings for this release."
+            f" Try get_entity_relationships(entity_type='release', entity_id='{release_id}',"
+            f" include_rels=['{rel_type}-rels']) for release-level relationships."
+        )
+
+    header = (
+        f"{rel_type.capitalize()} relationships for: {r.get('title', '?')} ({r.get('date', '?')})"
+        f" | release ID: {release_id}"
+    )
+    lines = [header]
+    for (rtype, name, eid), dates in sorted(entities.items(), key=lambda x: (x[0][0], x[0][1])):
+        date_str = f" [{', '.join(dates)}]" if any(dates) else ""
+        id_str = f" | {rel_type} ID: {eid}" if eid else ""
+        lines.append(f"  - {rtype.replace('_', ' ').capitalize()}: {name}{date_str}{id_str}")
+    return "\n".join(lines)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
