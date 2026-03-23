@@ -394,7 +394,8 @@ def search_releases(
     """
     Search for releases with specific filters.
     Prefer search_entities for simple title searches; use this when filtering
-    by artist, label, barcode, catalog number, or format.
+    by artist, label, barcode (UPC/EAN), catalog number, or format.
+    Also use this to find a release by its barcode.
     Args:
         title: Release title
         artist: Artist name
@@ -1130,23 +1131,6 @@ def get_label_details(label_id: MBID, alias_limit: int = 10) -> str:
     if urls:
         parts.append(f"URLs:\n{urls}")
     return "\n".join(parts)
-
-
-@mcp.tool(annotations=TOOL_ANNOTATIONS)
-@cached_tool()
-def lookup_by_barcode(barcode: str) -> str:
-    """Finds a release by its UPC/EAN barcode."""
-    barcode = "".join(c for c in barcode if c.isdigit())
-    result = musicbrainzngs.search_releases(barcode=barcode, limit=5)
-    releases = result.get("release-list", [])
-    if not releases:
-        return f"No releases found for barcode {barcode}."
-    lines = [f"Releases for barcode {barcode}:"]
-    for r in releases:
-        artist = r.get("artist-credit-phrase", "Unknown")
-        date = r.get("date", "?")
-        lines.append(f"- {r['title']} by {artist} ({date}) | release ID: {r['id']}")
-    return "\n".join(lines)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)

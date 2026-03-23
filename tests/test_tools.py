@@ -26,7 +26,6 @@ from mcp_musicbrainz.server import (
     get_release_group_details,
     get_series_details,
     get_work_details,
-    lookup_by_barcode,
     search_artists,
     search_entities,
     search_entities_fuzzy,
@@ -35,7 +34,6 @@ from mcp_musicbrainz.server import (
     search_releases,
 )
 from tests.conftest import (
-    BARCODE_LOOKUP_RESPONSE,
     BROWSE_RELEASE_GROUPS_RESPONSE,
     BROWSE_RELEASES_FOR_RG_RESPONSE,
     BROWSE_RELEASES_RESPONSE,
@@ -57,7 +55,6 @@ from tests.conftest import (
     GET_SERIES_RESPONSE,
     GET_WORK_RESPONSE,
     RB_ARTIST_ID,
-    RECTORY_BARCODE,
     RECTORY_RELEASE_ID,
     RECTORY_RG_ID,
     RG_COVER_ART_RESPONSE,
@@ -622,22 +619,6 @@ class TestGetLabelDetails:
         assert "Country: FI" in res
         assert "Rating: 3.8/5 (5 votes)" in res
         assert "discogs" in res
-
-
-# ── lookup_by_barcode ────────────────────────────────────────────────────────
-
-
-class TestLookupByBarcode:
-    def test_found(self):
-        with mock.patch("musicbrainzngs.search_releases", return_value=BARCODE_LOOKUP_RESPONSE):
-            res = lookup_by_barcode(RECTORY_BARCODE)
-        assert "In the Rectory" in res
-        assert "Reverend Bizarre" in res
-
-    def test_not_found(self):
-        with mock.patch("musicbrainzngs.search_releases", return_value={"release-list": []}):
-            res = lookup_by_barcode("0000000000000")
-        assert "No releases found" in res
 
 
 # ── get_entity_relationships ─────────────────────────────────────────────────
