@@ -84,11 +84,38 @@ SEARCH_FUNCS: dict[str, Any] = {
     "series": musicbrainzngs.search_series,
 }
 
+
+def _browse_artists_with_area(
+    recording: str | None = None,
+    release: str | None = None,
+    release_group: str | None = None,
+    work: str | None = None,
+    area: str | None = None,
+    includes: list[str] | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict[str, Any]:
+    """Wrapper around browse_artists that adds 'area' support missing from musicbrainzngs.
+
+    The MusicBrainz API supports browsing artists by area, but musicbrainzngs
+    (as of 0.7.1) does not expose it. This calls _browse_impl directly.
+    TODO: Remove this workaround once musicbrainzngs adds 'area' to browse_artists.
+    """
+    params = {
+        "recording": recording,
+        "release": release,
+        "release-group": release_group,
+        "work": work,
+        "area": area,
+    }
+    return musicbrainzngs.musicbrainz._browse_impl("artist", includes or [], limit, offset, params)
+
+
 BROWSE_FUNCS: dict[str, Any] = {
     "releases": musicbrainzngs.browse_releases,
     "recordings": musicbrainzngs.browse_recordings,
     "release-groups": musicbrainzngs.browse_release_groups,
-    "artists": musicbrainzngs.browse_artists,
+    "artists": _browse_artists_with_area,
     "labels": musicbrainzngs.browse_labels,
     "works": musicbrainzngs.browse_works,
     "events": musicbrainzngs.browse_events,
@@ -110,7 +137,7 @@ VALID_LINKED_TYPES = {
 # Valid (entity_type, linked_type) browse combinations per musicbrainzngs function signatures.
 # Note: "areas" browse is not supported by musicbrainzngs.
 VALID_BROWSE_COMBINATIONS: dict[str, set[str]] = {
-    "artists": {"recording", "release", "release_group", "work"},
+    "artists": {"area", "recording", "release", "release_group", "work"},
     "events": {"area", "artist", "place"},
     "labels": {"release"},
     "places": {"area"},
