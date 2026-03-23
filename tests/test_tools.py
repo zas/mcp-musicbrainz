@@ -198,6 +198,24 @@ class TestSearchArtists:
             search_artists("Reverend Bizarre", end_date="2007")
         assert m.call_args[1]["end"] == "2007"
 
+    def test_with_area_filter(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            search_artists("Reverend Bizarre", area="Tampere")
+        assert m.call_args[1]["area"] == "Tampere"
+
+    def test_filter_only_no_name(self):
+        with mock.patch("musicbrainzngs.search_artists", return_value=SEARCH_ARTISTS_RESPONSE) as m:
+            res = search_artists(artist_type="group", area="Lyon", begin_date="2020")
+        assert "artist" not in m.call_args[1]
+        assert m.call_args[1]["area"] == "Lyon"
+        assert m.call_args[1]["type"] == "group"
+        assert m.call_args[1]["begin"] == "2020"
+        assert "Found" in res
+
+    def test_no_params_returns_error(self):
+        res = search_artists()
+        assert "at least one search parameter" in res
+
 
 # ── search_labels / search_areas / search_events / search_places (begin/end) ─
 
