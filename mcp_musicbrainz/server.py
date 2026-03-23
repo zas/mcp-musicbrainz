@@ -647,7 +647,11 @@ def search_series(name: str, series_type: str | None = None, limit: int = 5, off
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def get_artist_details(
-    artist_id: MBID, alias_limit: int = 10, discography_limit: int = 10, discography_offset: int = 0
+    artist_id: MBID,
+    alias_limit: int = 10,
+    discography_limit: int = 10,
+    discography_offset: int = 0,
+    release_group_type: str | None = None,
 ) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,
@@ -657,6 +661,7 @@ def get_artist_details(
         alias_limit: Max number of aliases to show (default 10)
         discography_limit: Max number of release groups to show (default 10)
         discography_offset: Paging offset for the discography (default 0)
+        release_group_type: Filter discography by type: 'album', 'single', 'ep', 'broadcast', 'other'
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -672,11 +677,14 @@ def get_artist_details(
     aliases, tags = _extract_aliases_and_tags(a, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
-    rg_res = musicbrainzngs.browse_release_groups(
-        artist=artist_id,
-        limit=min(discography_limit, 100),
-        offset=discography_offset,
-    )
+    browse_kwargs: dict[str, Any] = {
+        "artist": artist_id,
+        "limit": min(discography_limit, 100),
+        "offset": discography_offset,
+    }
+    if release_group_type:
+        browse_kwargs["release_type"] = release_group_type
+    rg_res = musicbrainzngs.browse_release_groups(**browse_kwargs)
     rg_list = rg_res.get("release-group-list", [])
     rg_count = rg_res.get("release-group-count", len(rg_list))
     albums = []
