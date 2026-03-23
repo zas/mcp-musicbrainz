@@ -218,11 +218,11 @@ def _search_result_detail(entity_type: str, item: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
-def _search_entities(entity_type: str, query: str, limit: int = 5) -> str:
+def _search_entities(entity_type: str, query: str, limit: int = 5, offset: int = 0) -> str:
     """Internal helper: search any MusicBrainz entity type by Lucene query."""
     if entity_type not in SEARCH_FUNCS:
         return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(SEARCH_FUNCS)}"
-    result = SEARCH_FUNCS[entity_type](query=query, limit=limit)
+    result = SEARCH_FUNCS[entity_type](query=query, limit=limit, offset=offset)
     list_key = f"{entity_type.replace('-', '_')}-list"
     items = result.get(list_key, [])
     lines = [f"Found {len(items)} results for {entity_type}:"]
@@ -507,7 +507,9 @@ def search_release_groups(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_labels(name: str, label_type: str | None = None, country: str | None = None, limit: int = 5) -> str:
+def search_labels(
+    name: str, label_type: str | None = None, country: str | None = None, limit: int = 5, offset: int = 0
+) -> str:
     """
     Search for record labels.
     Args:
@@ -515,18 +517,21 @@ def search_labels(name: str, label_type: str | None = None, country: str | None 
         label_type: e.g. 'Original Production', 'Distributor', 'Holding', 'Reissue Production'
         country: ISO 3166-1 alpha-2 country code
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"label:{name}"]
     if label_type:
         parts.append(f'type:"{label_type}"')
     if country:
         parts.append(f"country:{country}")
-    return _search_entities("label", " AND ".join(parts), limit=limit)
+    return _search_entities("label", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_works(name: str, artist: str | None = None, work_type: str | None = None, limit: int = 5) -> str:
+def search_works(
+    name: str, artist: str | None = None, work_type: str | None = None, limit: int = 5, offset: int = 0
+) -> str:
     """
     Search for musical works (compositions).
     Args:
@@ -534,34 +539,38 @@ def search_works(name: str, artist: str | None = None, work_type: str | None = N
         artist: Composer or lyricist name
         work_type: e.g. 'Song', 'Opera', 'Symphony', 'Concerto'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"work:{name}"]
     if artist:
         parts.append(f"artist:{artist}")
     if work_type:
         parts.append(f"type:{work_type}")
-    return _search_entities("work", " AND ".join(parts), limit=limit)
+    return _search_entities("work", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_areas(name: str, area_type: str | None = None, limit: int = 5) -> str:
+def search_areas(name: str, area_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
     """
     Search for geographic areas (countries, cities, etc.).
     Args:
         name: Area name
         area_type: e.g. 'Country', 'City', 'Subdivision', 'Municipality'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"area:{name}"]
     if area_type:
         parts.append(f"type:{area_type}")
-    return _search_entities("area", " AND ".join(parts), limit=limit)
+    return _search_entities("area", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_events(name: str, artist: str | None = None, event_type: str | None = None, limit: int = 5) -> str:
+def search_events(
+    name: str, artist: str | None = None, event_type: str | None = None, limit: int = 5, offset: int = 0
+) -> str:
     """
     Search for music events (concerts, festivals, etc.).
     Args:
@@ -569,34 +578,38 @@ def search_events(name: str, artist: str | None = None, event_type: str | None =
         artist: Artist related to the event
         event_type: e.g. 'Concert', 'Festival', 'Convention/Expo'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"event:{name}"]
     if artist:
         parts.append(f"artist:{artist}")
     if event_type:
         parts.append(f"type:{event_type}")
-    return _search_entities("event", " AND ".join(parts), limit=limit)
+    return _search_entities("event", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_instruments(name: str, instrument_type: str | None = None, limit: int = 5) -> str:
+def search_instruments(name: str, instrument_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
     """
     Search for musical instruments.
     Args:
         name: Instrument name
         instrument_type: e.g. 'Wind instrument', 'String instrument', 'Percussion instrument', 'Electronic instrument'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"instrument:{name}"]
     if instrument_type:
         parts.append(f"type:{instrument_type}")
-    return _search_entities("instrument", " AND ".join(parts), limit=limit)
+    return _search_entities("instrument", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_places(name: str, place_type: str | None = None, area: str | None = None, limit: int = 5) -> str:
+def search_places(
+    name: str, place_type: str | None = None, area: str | None = None, limit: int = 5, offset: int = 0
+) -> str:
     """
     Search for places (venues, studios, etc.).
     Args:
@@ -604,29 +617,31 @@ def search_places(name: str, place_type: str | None = None, area: str | None = N
         place_type: e.g. 'Studio', 'Venue', 'Religious building'
         area: Area name the place is in
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"place:{name}"]
     if place_type:
         parts.append(f"type:{place_type}")
     if area:
         parts.append(f"area:{area}")
-    return _search_entities("place", " AND ".join(parts), limit=limit)
+    return _search_entities("place", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def search_series(name: str, series_type: str | None = None, limit: int = 5) -> str:
+def search_series(name: str, series_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
     """
     Search for series (release series, tours, etc.).
     Args:
         name: Series name
         series_type: e.g. 'Release group series', 'Tour', 'Festival'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
     """
     parts = [f"series:{name}"]
     if series_type:
         parts.append(f"type:{series_type}")
-    return _search_entities("series", " AND ".join(parts), limit=limit)
+    return _search_entities("series", " AND ".join(parts), limit=limit, offset=offset)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
