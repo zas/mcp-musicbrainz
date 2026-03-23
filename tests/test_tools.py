@@ -193,6 +193,9 @@ class TestSearchReleases:
         assert "Found 1 releases" in res
         assert "Reverend Bizarre" in res
         assert f"release ID: {RECTORY_RELEASE_ID}" in res
+        assert "Sinister Figure" in res
+        assert "SY-002" in res
+        assert '12" Vinyl' in res
 
     def test_no_params(self):
         res = search_releases()
@@ -207,6 +210,26 @@ class TestSearchReleases:
         with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
             search_releases(title="In the Rectory", artist="Reverend Bizarre", strict=True)
         assert m.call_args[1]["strict"] is True
+
+    def test_with_catno_filter(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(catno="SY-002")
+        assert m.call_args[1]["catno"] == "SY-002"
+
+    def test_with_format_filter(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(format='12" Vinyl')
+        assert m.call_args[1]["format"] == '12" Vinyl'
+
+    def test_with_barcode_filter(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(barcode="6420074201020")
+        assert m.call_args[1]["barcode"] == "6420074201020"
+
+    def test_with_label_filter(self):
+        with mock.patch("musicbrainzngs.search_releases", return_value=SEARCH_RELEASES_RESPONSE) as m:
+            search_releases(label="Sinister Figure")
+        assert m.call_args[1]["label"] == "Sinister Figure"
 
 
 # ── search_recordings ────────────────────────────────────────────────────────
