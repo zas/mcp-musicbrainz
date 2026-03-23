@@ -385,6 +385,8 @@ def search_releases(
     artist: str | None = None,
     label: str | None = None,
     barcode: str | None = None,
+    catno: str | None = None,
+    format: str | None = None,
     limit: int = 5,
     offset: int = 0,
     strict: bool = False,
@@ -392,12 +394,14 @@ def search_releases(
     """
     Search for releases with specific filters.
     Prefer search_entities for simple title searches; use this when filtering
-    by artist, label, or barcode.
+    by artist, label, barcode, catalog number, or format.
     Args:
         title: Release title
         artist: Artist name
         label: Label name
         barcode: UPC/EAN barcode
+        catno: Catalog number (insensitive to case, spaces, and separators)
+        format: Medium format (e.g. '12" Vinyl', 'CD', 'Digital Media')
         limit: Max results (default 5)
         offset: Number of results to skip for pagination (default 0)
         strict: If True, all filters must match (default False for fuzzy ranking)
@@ -411,8 +415,12 @@ def search_releases(
         kwargs["label"] = label
     if barcode:
         kwargs["barcode"] = "".join(c for c in barcode if c.isdigit())
+    if catno:
+        kwargs["catno"] = catno
+    if format:
+        kwargs["format"] = format
 
-    if not any((title, artist, label, barcode)):
+    if not any((title, artist, label, barcode, catno, format)):
         return "Please provide at least one search parameter."
 
     result = musicbrainzngs.search_releases(**kwargs)
@@ -428,9 +436,13 @@ def search_releases(
             for li in i.get("label-info-list", [])
             if li.get("label", {}).get("name")
         )
+        catnos = ", ".join(
+            li.get("catalog-number", "") for li in i.get("label-info-list", []) if li.get("catalog-number")
+        )
+        formats = ", ".join(m.get("format", "") for m in i.get("medium-list", []) if m.get("format"))
         rg = i.get("release-group", {})
         rg_info = f" | release-group ID: {rg['id']}" if rg.get("id") else ""
-        extras = " | ".join(filter(None, [date, country, labels]))
+        extras = " | ".join(filter(None, [date, country, formats, labels, catnos]))
         lines.append(f"- {rtitle} by {rartist} ({extras}) | release ID: {i['id']}{rg_info}")
     return "\n".join(lines)
 
