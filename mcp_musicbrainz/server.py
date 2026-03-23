@@ -218,36 +218,8 @@ def _search_result_detail(entity_type: str, item: dict[str, Any]) -> str:
     return ", ".join(parts)
 
 
-@mcp.tool(annotations=TOOL_ANNOTATIONS)
-@cached_tool()
-def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
-    """
-    Search for any MusicBrainz entity (artist, release, recording, label, work,
-    release-group, area, event, instrument, place, series).
-    Supports Lucene syntax. Example queries:
-    - 'artist:Nirvana AND country:US'
-    - 'release:Nevermind'
-    - 'recording:"Smells Like Teen Spirit"'
-    PRIMARY DATA SOURCE. Search for artists, releases, or recordings.
-    If an exact search (e.g., 'artist:Name') returns 0 results,
-    try a broader search with just the name string.
-    If still 0 results, use search_entities_fuzzy for typo-tolerant matching.
-
-    Entity hierarchy (IDs are NOT interchangeable):
-    - artist: a person or group
-    - release-group: an "album" concept (e.g. "Nevermind")
-      — has type (Album, EP, Single)
-    - release: a specific edition of a release-group (e.g. US CD vs JP vinyl)
-      - a release contains one or more media (disc 1, disc 2, etc.)
-      - each medium contains tracks (with position and optional title override)
-    - recording: a unique audio track (a song). Tracks on a release point to recordings.
-    - work: an abstract composition (lyrics + music), independent of any recording
-    - label: a record label that publishes releases (not release-groups)
-
-    Every ID returned is an MBID (UUID) bound to a specific entity type.
-    An MBID from a release-group CANNOT be used as a release_id, and vice versa.
-    Always track which entity type an ID belongs to and pass it to the matching tool.
-    """
+def _search_entities(entity_type: str, query: str, limit: int = 5) -> str:
+    """Internal helper: search any MusicBrainz entity type by Lucene query."""
     if entity_type not in SEARCH_FUNCS:
         return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(SEARCH_FUNCS)}"
     result = SEARCH_FUNCS[entity_type](query=query, limit=limit)
@@ -348,8 +320,6 @@ def search_artists(
 ) -> str:
     """
     Search for artists with specific filters.
-    Prefer search_entities for simple name searches; use this when filtering
-    by country, type, or gender.
     Args:
         name: Artist name
         country: ISO 3166-1 alpha-2 country code
@@ -393,8 +363,6 @@ def search_releases(
 ) -> str:
     """
     Search for releases with specific filters.
-    Prefer search_entities for simple title searches; use this when filtering
-    by artist, label, barcode (UPC/EAN), catalog number, or format.
     Also use this to find a release by its barcode.
     Args:
         title: Release title
@@ -461,8 +429,6 @@ def search_recordings(
 ) -> str:
     """
     Search for recordings with specific filters.
-    Prefer search_entities for simple title searches; use this when filtering
-    by artist, release, or ISRC.
     Args:
         title: Recording title
         artist: Artist name
@@ -508,8 +474,6 @@ def search_release_groups(
 ) -> str:
     """
     Search for release groups (albums/EPs/singles) with specific filters.
-    Prefer search_entities for simple title searches; use this when filtering
-    by artist or type.
     Args:
         title: Release group title
         artist: Artist name
@@ -539,6 +503,130 @@ def search_release_groups(
         date = i.get("first-release-date", "?")
         lines.append(f"- {rgtitle} by {rgartist} ({date}) [{rgtype}] | release-group ID: {i['id']}")
     return "\n".join(lines)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_labels(name: str, label_type: str | None = None, country: str | None = None, limit: int = 5) -> str:
+    """
+    Search for record labels.
+    Args:
+        name: Label name
+        label_type: e.g. 'Original Production', 'Distributor', 'Holding', 'Reissue Production'
+        country: ISO 3166-1 alpha-2 country code
+        limit: Max results (default 5)
+    """
+    parts = [f"label:{name}"]
+    if label_type:
+        parts.append(f'type:"{label_type}"')
+    if country:
+        parts.append(f"country:{country}")
+    return _search_entities("label", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_works(name: str, artist: str | None = None, work_type: str | None = None, limit: int = 5) -> str:
+    """
+    Search for musical works (compositions).
+    Args:
+        name: Work name
+        artist: Composer or lyricist name
+        work_type: e.g. 'Song', 'Opera', 'Symphony', 'Concerto'
+        limit: Max results (default 5)
+    """
+    parts = [f"work:{name}"]
+    if artist:
+        parts.append(f"artist:{artist}")
+    if work_type:
+        parts.append(f"type:{work_type}")
+    return _search_entities("work", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_areas(name: str, area_type: str | None = None, limit: int = 5) -> str:
+    """
+    Search for geographic areas (countries, cities, etc.).
+    Args:
+        name: Area name
+        area_type: e.g. 'Country', 'City', 'Subdivision', 'Municipality'
+        limit: Max results (default 5)
+    """
+    parts = [f"area:{name}"]
+    if area_type:
+        parts.append(f"type:{area_type}")
+    return _search_entities("area", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_events(name: str, artist: str | None = None, event_type: str | None = None, limit: int = 5) -> str:
+    """
+    Search for music events (concerts, festivals, etc.).
+    Args:
+        name: Event name
+        artist: Artist related to the event
+        event_type: e.g. 'Concert', 'Festival', 'Convention/Expo'
+        limit: Max results (default 5)
+    """
+    parts = [f"event:{name}"]
+    if artist:
+        parts.append(f"artist:{artist}")
+    if event_type:
+        parts.append(f"type:{event_type}")
+    return _search_entities("event", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_instruments(name: str, instrument_type: str | None = None, limit: int = 5) -> str:
+    """
+    Search for musical instruments.
+    Args:
+        name: Instrument name
+        instrument_type: e.g. 'Wind instrument', 'String instrument', 'Percussion instrument', 'Electronic instrument'
+        limit: Max results (default 5)
+    """
+    parts = [f"instrument:{name}"]
+    if instrument_type:
+        parts.append(f"type:{instrument_type}")
+    return _search_entities("instrument", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_places(name: str, place_type: str | None = None, area: str | None = None, limit: int = 5) -> str:
+    """
+    Search for places (venues, studios, etc.).
+    Args:
+        name: Place name
+        place_type: e.g. 'Studio', 'Venue', 'Religious building'
+        area: Area name the place is in
+        limit: Max results (default 5)
+    """
+    parts = [f"place:{name}"]
+    if place_type:
+        parts.append(f"type:{place_type}")
+    if area:
+        parts.append(f"area:{area}")
+    return _search_entities("place", " AND ".join(parts), limit=limit)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_series(name: str, series_type: str | None = None, limit: int = 5) -> str:
+    """
+    Search for series (release series, tours, etc.).
+    Args:
+        name: Series name
+        series_type: e.g. 'Release group series', 'Tour', 'Festival'
+        limit: Max results (default 5)
+    """
+    parts = [f"series:{name}"]
+    if series_type:
+        parts.append(f"type:{series_type}")
+    return _search_entities("series", " AND ".join(parts), limit=limit)
 
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
@@ -1366,18 +1454,18 @@ def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
     Typo-tolerant fuzzy search. Tries an exact search first, then falls back to
     fuzzy matching if no results are found.
-    Supports all entity types from search_entities (artist, release, recording,
-    label, work, release-group, area, event, instrument, place, series).
+    Supports entity types: artist, release, recording, label, work,
+    release-group, area, event, instrument, place, series.
     Use when the query may contain misspellings (e.g., 'Bjork' -> 'Björk').
     """
     # Try exact search first
-    exact = search_entities(entity_type=entity_type, query=query, limit=limit)
+    exact = _search_entities(entity_type=entity_type, query=query, limit=limit)
     if not exact.startswith("Found 0"):
         return exact
 
     # Fall back to fuzzy matching
     fuzzy_query = " ".join([f"{word}~" for word in query.split()])
-    return search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)
+    return _search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)
 
 
 @mcp.tool(annotations={"readOnlyHint": False, "idempotentHint": True, "openWorldHint": False})
