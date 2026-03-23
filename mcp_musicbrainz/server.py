@@ -1317,10 +1317,24 @@ ALL_REL_INCLUDES = [
 @cached_tool()
 def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: list[str] | None = None) -> str:
     """
-    Get relationships for any entity type (e.g., band members, producers,
-    recording studios, Wikipedia links).
+    Get relationships for any entity type.
     For performer credits on recordings, prefer get_album_tracks (whole album)
     or get_recording_details (single track) which include them directly.
+
+    Common queries and how to find them:
+      - Band members/lineup → entity_type='artist', artist-rels (member of band, founder, supporting musician)
+      - Recording studio → entity_type='recording', place-rels (recorded at, mixed at, engineered at)
+      - Mastering/pressing location → entity_type='release', place-rels (mastered at, manufactured at, pressed at)
+      - Producers/engineers → entity_type='recording', artist-rels (producer, engineer, mixer)
+      - Composers/lyricists → entity_type='work', artist-rels (composer, lyricist, writer, arranger)
+      - Wikipedia/Discogs/social links → any entity_type, url-rels
+      - Family relationships → entity_type='artist', artist-rels (parent, sibling, married)
+      - Label relationships → entity_type='release', label-rels (published by, distributed by)
+      - Samples/remixes → entity_type='recording', recording-rels (samples, remix of)
+
+    Note: studio/place info is usually on individual recordings, not on the release-group.
+    If place-rels returns nothing for a release-group, try on a recording instead.
+
     Args:
         entity_type: artist, release, release-group, recording, work, label, area,
                      place, event, instrument, series
@@ -1328,17 +1342,17 @@ def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: li
         include_rels: Which relationship types to fetch. Default (None) fetches
             artist-rels and url-rels. Available types:
             - area-rels: linked geographic areas
-            - artist-rels: linked artists (members, producers, performers)
-            - event-rels: linked events
+            - artist-rels: linked artists (members, producers, performers, composers, family)
+            - event-rels: linked events (concerts, festivals)
             - instrument-rels: linked instruments
             - label-rels: linked labels (publishers, distributors)
-            - place-rels: linked places (studios, venues)
-            - recording-rels: linked recordings
+            - place-rels: linked places (recording/mixing/mastering studios, pressing plants, venues)
+            - recording-rels: linked recordings (samples, remixes, compilations)
             - release-group-rels: linked release groups
             - release-rels: linked releases
-            - series-rels: linked series
-            - url-rels: linked URLs (Wikipedia, Discogs, etc.)
-            - work-rels: linked works
+            - series-rels: linked series (tours, release series)
+            - url-rels: linked URLs (Wikipedia, Discogs, Wikidata, official sites, streaming)
+            - work-rels: linked works (compositions, arrangements)
     """
     if entity_type not in ENTITY_LOOKUP_FUNCS:
         return f"Invalid entity type. Choose from: {', '.join(ENTITY_LOOKUP_FUNCS.keys())}"
