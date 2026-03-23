@@ -19,8 +19,7 @@ An MCP (Model Context Protocol) server that provides tools for querying the [Mus
 | `search_series` | Search for series (release series, tours) with filters (type) |
 | `search_entities_fuzzy` | Typo-tolerant search with automatic exact-first fallback |
 | `browse_entities` | Browse entities linked to another entity with paging and optional includes (e.g. all releases by an artist with label info) |
-| `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and first 10 release groups |
-| `get_artist_discography` | Full paged discography (release groups) for an artist |
+| `get_artist_details` | Artist info with aliases, genres, ratings, URLs, and paged discography |
 | `get_release_details` | Release (specific edition) tracklist, barcode, label, and catalog number |
 | `get_release_group_details` | Release group (album concept) details with type, genres, and editions (with label, format, country) |
 | `get_recording_details` | Recording info with appearances, ISRCs, and genres |
