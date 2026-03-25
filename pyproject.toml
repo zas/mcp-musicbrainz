@@ -27,7 +27,7 @@ Issues = "https://github.com/zas/mcp-musicbrainz/issues"
 
 [project.scripts]
 mcp-musicbrainz = "mcp_musicbrainz.server:mcp.run"
-mcp-musicbrainz-sse = "mcp_musicbrainz.sse_server:main"
+mcp-musicbrainz-sse = "mcp_musicbrainz.http_server:main"
 
 [dependency-groups]
 dev = [
