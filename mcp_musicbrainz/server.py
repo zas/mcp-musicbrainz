@@ -9,6 +9,7 @@ import musicbrainzngs
 from fastmcp import FastMCP
 
 from mcp_musicbrainz import __version__
+from mcp_musicbrainz.throttling.token_bucket import rate_limited
 
 mcp = FastMCP("MusicBrainz")
 cache = diskcache.Cache(".musicbrainz_cache")
@@ -264,6 +265,7 @@ def browse_entities(
 
 @mcp.tool()
 @cached_tool()
+@rate_limited
 def search_artists(
     name: str,
     country: str | None = None,
@@ -303,6 +305,7 @@ def search_artists(
 
 @mcp.tool()
 @cached_tool()
+@rate_limited
 def search_releases(
     title: str | None = None,
     artist: str | None = None,
@@ -347,6 +350,7 @@ def search_releases(
 
 @mcp.tool()
 @cached_tool()
+@rate_limited
 def search_release_groups(
     title: str | None = None,
     artist: str | None = None,
@@ -388,6 +392,7 @@ def search_release_groups(
 
 @mcp.tool()
 @cached_tool()
+@rate_limited
 def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,
