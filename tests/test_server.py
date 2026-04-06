@@ -7,10 +7,11 @@ from mcp_musicbrainz.server import (
     _fmt_duration,
     _fmt_rating,
     _fmt_tags,
+    _format_performers,
     _format_tracks,
     _mb_error_message,
+    _search_entities,
     browse_entities,
-    search_entities,
 )
 
 
@@ -65,7 +66,7 @@ class TestFormatTracks:
                 "track-list": [
                     {
                         "number": "1",
-                        "recording": {"title": "Song", "length": "180000"},
+                        "recording": {"id": "abc-123", "title": "Song", "length": "180000"},
                     }
                 ],
             }
@@ -73,6 +74,7 @@ class TestFormatTracks:
         result = _format_tracks(media)
         assert len(result) == 1
         assert "1. Song (3:00)" in result[0]
+        assert "recording ID: abc-123" in result[0]
         assert "[CD]" not in result[0]
 
     def test_multi_medium_has_prefix(self):
@@ -81,7 +83,7 @@ class TestFormatTracks:
             "track-list": [
                 {
                     "number": "1",
-                    "recording": {"title": "Track", "length": "60000"},
+                    "recording": {"id": "abc-123", "title": "Track", "length": "60000"},
                 }
             ],
         }
@@ -98,6 +100,83 @@ class TestFormatTracks:
         ]
         result = _format_tracks(media)
         assert "??:??" in result[0]
+
+    def test_missing_recording_id(self):
+        media = [
+            {
+                "track-list": [
+                    {"number": "1", "recording": {"title": "X", "length": "60000"}},
+                ]
+            }
+        ]
+        result = _format_tracks(media)
+        assert "recording ID" not in result[0]
+
+    def test_include_performers(self):
+        media = [
+            {
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": "abc-123",
+                            "title": "Song",
+                            "length": "180000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["guitar"],
+                                    "artist": {"name": "Alice"},
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = _format_tracks(media, include_performers=True)
+        assert len(result) == 2
+        assert "Instrument (guitar): Alice" in result[1]
+
+    def test_no_performers_by_default(self):
+        media = [
+            {
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": "abc-123",
+                            "title": "Song",
+                            "length": "180000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["guitar"],
+                                    "artist": {"name": "Alice"},
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        ]
+        result = _format_tracks(media)
+        assert len(result) == 1
+
+
+class TestFormatPerformers:
+    def test_empty(self):
+        assert _format_performers([]) == []
+
+    def test_with_attributes(self):
+        rels = [{"type": "instrument", "attribute-list": ["trombone"], "artist": {"name": "Bob"}}]
+        result = _format_performers(rels)
+        assert result == ["  - Instrument (trombone): Bob"]
+
+    def test_without_attributes(self):
+        rels = [{"type": "performer", "artist": {"name": "Carol"}}]
+        result = _format_performers(rels)
+        assert result == ["  - Performer: Carol"]
 
 
 class TestFuncMaps:
@@ -118,7 +197,7 @@ class TestFuncMaps:
 
 class TestInputValidation:
     def test_search_invalid_entity_type(self):
-        result = search_entities("bogus", "test")
+        result = _search_entities("bogus", "test")
         assert "Invalid entity type" in result
         assert "bogus" in result
 

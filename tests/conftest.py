@@ -52,6 +52,7 @@ GET_ARTIST_RESPONSE = {
         "country": "FI",
         "disambiguation": "Finnish doom metal band",
         "life-span": {"begin": "1995", "end": "2007", "ended": "true"},
+        "annotation": {"text": "Formed in Loimaa, Finland."},
         "alias-list": [
             {"sort-name": "Reverand Bizarre", "type": "Search hint", "alias": "Reverand Bizarre"},
             {"sort-name": "Reverend Bizare", "type": "Search hint", "alias": "Reverend Bizare"},
@@ -140,7 +141,6 @@ GET_RELEASE_GROUP_RESPONSE = {
                 "status": "Official",
                 "date": "2002-03-28",
                 "country": "FI",
-                "artist-credit-phrase": "Reverend Bizarre",
             },
             {
                 "id": "036abc08-d4c4-4e32-ab61-5358d7a67f40",
@@ -148,13 +148,42 @@ GET_RELEASE_GROUP_RESPONSE = {
                 "status": "Official",
                 "date": "2002",
                 "country": "RU",
-                "artist-credit-phrase": "Reverend Bizarre",
             },
         ],
         "release-count": 5,
         "tag-list": [{"count": "2", "name": "doom metal"}],
         "rating": {"votes-count": "2", "rating": "4.25"},
     }
+}
+
+# -- browse_releases for release group details --
+BROWSE_RELEASES_FOR_RG_RESPONSE = {
+    "release-list": [
+        {
+            "id": RECTORY_RELEASE_ID,
+            "title": "In the Rectory of the Bizarre Reverend",
+            "status": "Official",
+            "date": "2002-03-28",
+            "country": "FI",
+            "label-info-list": [
+                {
+                    "catalog-number": "SFGCD10",
+                    "label": {"id": SINISTER_LABEL_ID, "name": "Sinister Figure"},
+                }
+            ],
+            "medium-list": [{"position": "1", "format": "CD"}],
+        },
+        {
+            "id": "036abc08-d4c4-4e32-ab61-5358d7a67f40",
+            "title": "In the Rectory of the Bizarre Reverend",
+            "status": "Official",
+            "date": "2002",
+            "country": "RU",
+            "label-info-list": [],
+            "medium-list": [{"position": "1", "format": "CD"}],
+        },
+    ],
+    "release-count": 5,
 }
 
 # -- get_release_by_id response --
@@ -166,11 +195,14 @@ GET_RELEASE_RESPONSE = {
         "date": "2002-03-28",
         "country": "FI",
         "barcode": RECTORY_BARCODE,
+        "disambiguation": "first press",
+        "annotation": {"text": "Recorded at Tico-Tico Studio."},
         "artist-credit-phrase": "Reverend Bizarre",
         "release-group": {
             "id": RECTORY_RG_ID,
             "type": "Album",
             "title": "In the Rectory of the Bizarre Reverend",
+            "tag-list": [{"count": "2", "name": "doom metal"}],
         },
         "label-info-list": [
             {
@@ -188,7 +220,26 @@ GET_RELEASE_RESPONSE = {
                         "position": "1",
                         "number": "1",
                         "length": "532413",
-                        "recording": {"id": BURN_RECORDING_ID, "title": "Burn in Hell!", "length": "532413"},
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "532413",
+                            "artist-relation-list": [
+                                {
+                                    "type": "instrument",
+                                    "attribute-list": ["bass guitar"],
+                                    "artist": {"id": "aaa00001-0000-0000-0000-000000000001", "name": "Kimi Kärki"},
+                                },
+                                {
+                                    "type": "vocal",
+                                    "attribute-list": ["lead vocals"],
+                                    "artist": {
+                                        "id": "aaa00003-0000-0000-0000-000000000003",
+                                        "name": "Albert Witchfinder",
+                                    },
+                                },
+                            ],
+                        },
                     },
                     {
                         "id": "1d929982-20d3-3085-b8c2-a67e8ec01c53",
@@ -279,6 +330,42 @@ GET_RECORDING_RESPONSE = {
             {"count": "1", "name": "finnish metal"},
         ],
         "rating": {"votes-count": "2", "rating": "4.25"},
+        "work-relation-list": [
+            {
+                "type": "performance",
+                "work": {
+                    "id": BURN_WORK_ID,
+                    "title": "Burn in Hell",
+                    "artist-relation-list": [
+                        {
+                            "type": "composer",
+                            "artist": {"id": "80c4f609-e9e6-440d-aa8d-252224ef4d92", "name": "Dee Snider"},
+                        },
+                        {
+                            "type": "lyricist",
+                            "artist": {"id": "80c4f609-e9e6-440d-aa8d-252224ef4d92", "name": "Dee Snider"},
+                        },
+                    ],
+                },
+            },
+        ],
+        "artist-relation-list": [
+            {
+                "type": "instrument",
+                "attribute-list": ["bass guitar"],
+                "artist": {"id": "aaa00001-0000-0000-0000-000000000001", "name": "Kimi Kärki"},
+            },
+            {
+                "type": "instrument",
+                "attribute-list": ["drums (drum set)"],
+                "artist": {"id": "aaa00002-0000-0000-0000-000000000002", "name": "Earl of Void"},
+            },
+            {
+                "type": "vocal",
+                "attribute-list": ["lead vocals"],
+                "artist": {"id": "aaa00003-0000-0000-0000-000000000003", "name": "Albert Witchfinder"},
+            },
+        ],
     }
 }
 
@@ -365,6 +452,34 @@ BROWSE_RELEASES_RESPONSE = {
     "release-count": 48,
 }
 
+# -- browse_releases response with labels include --
+BROWSE_RELEASES_WITH_LABELS_RESPONSE = {
+    "release-list": [
+        {
+            "id": "77e0f608-e340-4c02-88a1-c11b33efc85d",
+            "title": "Practice Sessions",
+            "date": "1996",
+            "label-info-list": [
+                {"label": {"id": "157afde4-4bf5-4039-8ad2-5a15acc85176", "name": "[no label]"}},
+            ],
+            "label-info-count": 1,
+        },
+        {
+            "id": RECTORY_RELEASE_ID,
+            "title": "In the Rectory of the Bizarre Reverend",
+            "date": "2002-03-28",
+            "label-info-list": [
+                {
+                    "catalog-number": "SFGCD10",
+                    "label": {"id": "d7d0a16e-a051-49aa-b6f5-20aba76b1143", "name": "Sinister Figure"},
+                },
+            ],
+            "label-info-count": 1,
+        },
+    ],
+    "release-count": 48,
+}
+
 # -- search_releases response --
 SEARCH_RELEASES_RESPONSE = {
     "release-list": [
@@ -373,9 +488,31 @@ SEARCH_RELEASES_RESPONSE = {
             "title": "In the Rectory of the Bizarre Reverend",
             "date": "2002-03-28",
             "artist-credit-phrase": "Reverend Bizarre",
+            "label-info-list": [
+                {
+                    "catalog-number": "SY-002",
+                    "label": {"name": "Sinister Figure"},
+                },
+            ],
+            "medium-list": [
+                {"format": '12" Vinyl'},
+            ],
         },
     ],
     "release-count": 1,
+}
+
+# -- search_recordings response --
+SEARCH_RECORDINGS_RESPONSE = {
+    "recording-list": [
+        {
+            "id": BURN_RECORDING_ID,
+            "title": "Burn in Hell!",
+            "length": "532413",
+            "artist-credit-phrase": "Reverend Bizarre",
+        },
+    ],
+    "recording-count": 1,
 }
 
 # -- search_release_groups response --
@@ -401,6 +538,9 @@ GET_ARTIST_RELS_RESPONSE = {
             {
                 "type": "member of band",
                 "direction": "backward",
+                "begin": "1999",
+                "end": "2007",
+                "ended": "true",
                 "attribute-list": ["bass guitar", "lead vocals", "original"],
                 "artist": {"id": "6b3ed1ba-ce18-422f-823e-bf39137f8d56", "name": "Albert Witchfinder"},
             },
@@ -498,6 +638,88 @@ GET_SERIES_RESPONSE = {
         "type": "Tour",
         "alias-list": [{"alias": "DotC", "sort-name": "DotC"}],
         "tag-list": [{"count": "1", "name": "doom metal"}],
+    }
+}
+
+GET_RELEASE_WITH_RECORDING_PLACE_RELS = {
+    "release": {
+        "id": RECTORY_RELEASE_ID,
+        "title": "In the Rectory of the Bizarre Reverend",
+        "date": "2002-06-24",
+        "medium-list": [
+            {
+                "position": "1",
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "420000",
+                            "place-relation-list": [
+                                {
+                                    "type": "recorded at",
+                                    "place": {"id": "place-studio-1", "name": "Tico-Tico Studio"},
+                                    "begin": "2001-10",
+                                    "end": "2001-11",
+                                },
+                                {
+                                    "type": "mixed at",
+                                    "place": {"id": "place-studio-2", "name": "Finnvox Studios"},
+                                    "begin": "2002-01",
+                                    "end": "2002-01",
+                                },
+                            ],
+                        },
+                    },
+                    {
+                        "number": "2",
+                        "recording": {
+                            "id": "rec-2",
+                            "title": "The Devil Rides Out",
+                            "length": "300000",
+                            "place-relation-list": [
+                                {
+                                    "type": "recorded at",
+                                    "place": {"id": "place-studio-1", "name": "Tico-Tico Studio"},
+                                    "begin": "2001-10",
+                                    "end": "2001-11",
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        ],
+    }
+}
+
+GET_RELEASE_WITH_RECORDING_ARTIST_RELS = {
+    "release": {
+        "id": RECTORY_RELEASE_ID,
+        "title": "In the Rectory of the Bizarre Reverend",
+        "date": "2002-06-24",
+        "medium-list": [
+            {
+                "position": "1",
+                "track-list": [
+                    {
+                        "number": "1",
+                        "recording": {
+                            "id": BURN_RECORDING_ID,
+                            "title": "Burn in Hell!",
+                            "length": "420000",
+                            "artist-relation-list": [
+                                {
+                                    "type": "engineer",
+                                    "artist": {"id": "artist-eng-1", "name": "Anssi Kippo"},
+                                },
+                            ],
+                        },
+                    },
+                ],
+            }
+        ],
     }
 }
 

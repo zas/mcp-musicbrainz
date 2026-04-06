@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import functools
+import logging
 from collections.abc import Callable
-from typing import Any
+from typing import Any, NewType
 
 import diskcache
 import musicbrainzngs
@@ -11,12 +12,17 @@ from fastmcp import FastMCP
 from mcp_musicbrainz import __version__
 from mcp_musicbrainz.throttling.token_bucket import rate_limited
 
+#: MusicBrainz Identifier — a UUID that uniquely identifies an entity (artist, release, recording, etc.)
+MBID = NewType("MBID", str)
+
+logger = logging.getLogger(__name__)
+
 mcp = FastMCP("MusicBrainz")
 cache = diskcache.Cache(".musicbrainz_cache")
 
 # Bump this when changing how API responses are fetched or formatted,
 # so stale cached results are automatically bypassed.
-CACHE_VERSION = 2
+CACHE_VERSION = 8
 
 musicbrainzngs.set_useragent(
     "mcp-musicbrainz",
@@ -24,6 +30,8 @@ musicbrainzngs.set_useragent(
     "https://github.com/zas/mcp-musicbrainz",
 )
 
+
+TOOL_ANNOTATIONS = {"readOnlyHint": True, "idempotentHint": True, "openWorldHint": True}
 
 ID_HINT: dict[str, str] = {
     "get_release_details": "If you have a release-group ID, use get_release_group_details or get_album_tracks instead.",
@@ -54,8 +62,9 @@ def cached_tool(expire: int = 86400) -> Callable:
                 msg = _mb_error_message(e)
                 hint = ID_HINT.get(func.__name__, "")  # type: ignore[union-attr]
                 return f"{msg} {hint}".strip() if hint else msg
-            except Exception as e:
-                return f"An unexpected error occurred: {e}"
+            except Exception:
+                logger.exception("Unexpected error in %s", func.__name__)  # type: ignore[union-attr]
+                return "An unexpected error occurred. Check server logs for details."
 
         return wrapper
 
@@ -76,11 +85,38 @@ SEARCH_FUNCS: dict[str, Any] = {
     "series": musicbrainzngs.search_series,
 }
 
+
+def _browse_artists_with_area(
+    recording: str | None = None,
+    release: str | None = None,
+    release_group: str | None = None,
+    work: str | None = None,
+    area: str | None = None,
+    includes: list[str] | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> dict[str, Any]:
+    """Wrapper around browse_artists that adds 'area' support missing from musicbrainzngs.
+
+    The MusicBrainz API supports browsing artists by area, but musicbrainzngs
+    (as of 0.7.1) does not expose it. This calls _browse_impl directly.
+    TODO: Remove this workaround once musicbrainzngs adds 'area' to browse_artists.
+    """
+    params = {
+        "recording": recording,
+        "release": release,
+        "release-group": release_group,
+        "work": work,
+        "area": area,
+    }
+    return musicbrainzngs.musicbrainz._browse_impl("artist", includes or [], limit, offset, params)
+
+
 BROWSE_FUNCS: dict[str, Any] = {
     "releases": musicbrainzngs.browse_releases,
     "recordings": musicbrainzngs.browse_recordings,
     "release-groups": musicbrainzngs.browse_release_groups,
-    "artists": musicbrainzngs.browse_artists,
+    "artists": _browse_artists_with_area,
     "labels": musicbrainzngs.browse_labels,
     "works": musicbrainzngs.browse_works,
     "events": musicbrainzngs.browse_events,
@@ -95,31 +131,21 @@ VALID_LINKED_TYPES = {
     "release_group",
     "work",
     "area",
-    "collection",
-    "track",
+    "place",
     "track_artist",
 }
 
-# Valid (entity_type, linked_type) browse combinations per MusicBrainz API.
+# Valid (entity_type, linked_type) browse combinations per musicbrainzngs function signatures.
 # Note: "areas" browse is not supported by musicbrainzngs.
 VALID_BROWSE_COMBINATIONS: dict[str, set[str]] = {
-    "artists": {"area", "collection", "recording", "release", "release_group", "work"},
-    "events": {"area", "artist", "collection", "place"},
-    "labels": {"area", "collection", "release"},
-    "places": {"area", "collection"},
-    "recordings": {"artist", "collection", "release", "work"},
-    "releases": {
-        "area",
-        "artist",
-        "collection",
-        "label",
-        "track",
-        "track_artist",
-        "recording",
-        "release_group",
-    },
-    "release-groups": {"artist", "collection", "release"},
-    "works": {"artist", "collection"},
+    "artists": {"area", "recording", "release", "release_group", "work"},
+    "events": {"area", "artist", "place"},
+    "labels": {"release"},
+    "places": {"area"},
+    "recordings": {"artist", "release"},
+    "releases": {"artist", "track_artist", "label", "recording", "release_group"},
+    "release-groups": {"artist", "release"},
+    "works": {"artist"},
 }
 
 
@@ -151,7 +177,18 @@ def _mb_error_message(err: musicbrainzngs.MusicBrainzError) -> str:
     return f"MusicBrainz error: {err}"
 
 
-def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
+def _format_performers(artist_relation_list: list[dict[str, Any]]) -> list[str]:
+    performers = []
+    for rel in artist_relation_list:
+        rtype = rel.get("type", "Unknown")
+        attrs = rel.get("attribute-list", [])
+        name = rel.get("artist", {}).get("name", "Unknown")
+        attrs_str = f" ({', '.join(attrs)})" if attrs else ""
+        performers.append(f"  - {rtype.capitalize()}{attrs_str}: {name}")
+    return performers
+
+
+def _format_tracks(medium_list: list[dict[str, Any]], include_performers: bool = False) -> list[str]:
     tracks = []
     for medium in medium_list:
         fmt = medium.get("format", "")
@@ -159,43 +196,61 @@ def _format_tracks(medium_list: list[dict[str, Any]]) -> list[str]:
         for t in medium.get("track-list", []):
             rec = t.get("recording", {})
             dur = _fmt_duration(rec.get("length"))
-            tracks.append(f"  {prefix}{t['number']}. {rec.get('title', '?')} ({dur})")
+            rec_id = rec.get("id", "")
+            rec_suffix = f" | recording ID: {rec_id}" if rec_id else ""
+            tracks.append(f"  {prefix}{t['number']}. {rec.get('title', '?')} ({dur}){rec_suffix}")
+            if include_performers:
+                tracks.extend(_format_performers(rec.get("artist-relation-list", [])))
     return tracks
 
 
-@mcp.tool()
-@cached_tool()
-def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
-    """
-    Search for any MusicBrainz entity (artist, release, recording, label, work,
-    release-group, area, event, instrument, place, series).
-    Supports Lucene syntax. Example queries:
-    - 'artist:Nirvana AND country:US'
-    - 'release:Nevermind'
-    - 'recording:"Smells Like Teen Spirit"'
-    PRIMARY DATA SOURCE. Search for artists, releases, or recordings.
-    If an exact search (e.g., 'artist:Name') returns 0 results,
-    try a broader search with just the name string.
-    If still 0 results, use search_entities_fuzzy for typo-tolerant matching.
+def _search_result_detail(entity_type: str, item: dict[str, Any]) -> str:
+    """Extract key details from a search result to reduce follow-up queries."""
+    parts: list[str] = []
+    if entity_type == "artist":
+        if t := item.get("type"):
+            parts.append(t)
+        if c := item.get("country"):
+            parts.append(c)
+        ls = item.get("life-span", {})
+        if begin := ls.get("begin"):
+            end = ls.get("end", "present")
+            parts.append(f"{begin}–{end}")
+    elif entity_type == "release":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if d := item.get("date"):
+            parts.append(d)
+        if c := item.get("country"):
+            parts.append(c)
+        for li in item.get("label-info-list", []):
+            if lbl := li.get("label", {}).get("name"):
+                parts.append(lbl)
+    elif entity_type == "recording":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if length := item.get("length"):
+            parts.append(_fmt_duration(length))
+    elif entity_type == "release-group":
+        if a := item.get("artist-credit-phrase"):
+            parts.append(f"by {a}")
+        if d := item.get("first-release-date"):
+            parts.append(d)
+        if t := item.get("type") or item.get("primary-type"):
+            parts.append(t)
+    elif entity_type == "label":
+        if t := item.get("type"):
+            parts.append(t)
+        if c := item.get("country"):
+            parts.append(c)
+    return ", ".join(parts)
 
-    Entity hierarchy (IDs are NOT interchangeable):
-    - artist: a person or group
-    - release-group: an "album" concept (e.g. "Nevermind")
-      — has type (Album, EP, Single)
-    - release: a specific edition of a release-group (e.g. US CD vs JP vinyl)
-      - a release contains one or more media (disc 1, disc 2, etc.)
-      - each medium contains tracks (with position and optional title override)
-    - recording: a unique audio track (a song). Tracks on a release point to recordings.
-    - work: an abstract composition (lyrics + music), independent of any recording
-    - label: a record label that publishes releases (not release-groups)
 
-    Every ID returned is an MBID (UUID) bound to a specific entity type.
-    An MBID from a release-group CANNOT be used as a release_id, and vice versa.
-    Always track which entity type an ID belongs to and pass it to the matching tool.
-    """
+def _search_entities(entity_type: str, query: str, limit: int = 5, offset: int = 0) -> str:
+    """Internal helper: search any MusicBrainz entity type by Lucene query."""
     if entity_type not in SEARCH_FUNCS:
         return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(SEARCH_FUNCS)}"
-    result = SEARCH_FUNCS[entity_type](query=query, limit=limit)
+    result = SEARCH_FUNCS[entity_type](query=query, limit=limit, offset=offset)
     list_key = f"{entity_type.replace('-', '_')}-list"
     items = result.get(list_key, [])
     lines = [f"Found {len(items)} results for {entity_type}:"]
@@ -203,18 +258,21 @@ def search_entities(entity_type: str, query: str, limit: int = 5) -> str:
         name = i.get("name") or i.get("title")
         disambig = i.get("disambiguation", "")
         extra = f" ({disambig})" if disambig else ""
-        lines.append(f"- {name}{extra} | {entity_type} ID: {i['id']}")
+        detail = _search_result_detail(entity_type, i)
+        detail_str = f" [{detail}]" if detail else ""
+        lines.append(f"- {name}{extra}{detail_str} | {entity_type} ID: {i['id']}")
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def browse_entities(
     entity_type: str,
     linked_type: str,
-    linked_id: str,
+    linked_id: MBID,
     limit: int = 25,
     offset: int = 0,
+    includes: list[str] | None = None,
 ) -> str:
     """
     Browse MusicBrainz entities linked to another entity, with paging.
@@ -234,6 +292,11 @@ def browse_entities(
         linked_id: MBID of the linked entity
         limit: Results per page (max 100)
         offset: Paging offset
+        includes: Extra data to fetch per entity. Useful examples:
+            - 'labels' on releases: get label + catalog number per release
+            - 'artist-credits' on releases/recordings: get artist names
+            - 'tags' on most entity types: get genre tags
+            - 'isrcs' on recordings: get ISRCs
     """
     if entity_type not in BROWSE_FUNCS:
         return f"Invalid entity type '{entity_type}'. Choose from: {', '.join(BROWSE_FUNCS)}"
@@ -246,7 +309,10 @@ def browse_entities(
             f"Valid linked types: {', '.join(sorted(valid_for_entity))}"
         )
 
-    result = BROWSE_FUNCS[entity_type](**{normalized: linked_id, "limit": min(limit, 100), "offset": offset})
+    kwargs: dict[str, Any] = {normalized: linked_id, "limit": min(limit, 100), "offset": offset}
+    if includes:
+        kwargs["includes"] = includes
+    result = BROWSE_FUNCS[entity_type](**kwargs)
     singular = entity_type.rstrip("s")
     list_key = f"{singular}-list"
     count_key = f"{singular}-count"
@@ -257,40 +323,72 @@ def browse_entities(
         name = i.get("title") or i.get("name", "?")
         date = i.get("first-release-date") or i.get("date", "")
         rtype = i.get("type") or i.get("primary-type", "")
-        extra = " | ".join(filter(None, [date, rtype]))
-        extra_str = f" ({extra})" if extra else ""
+        parts = [p for p in [date, rtype] if p]
+        # Append label info when available (from includes=['labels'])
+        for li in i.get("label-info-list", []):
+            lbl = li.get("label", {}).get("name")
+            cat = li.get("catalog-number")
+            if lbl:
+                parts.append(f"{lbl} ({cat})" if cat else lbl)
+        extra_str = f" ({' | '.join(parts)})" if parts else ""
         lines.append(f"- {name}{extra_str} | {singular} ID: {i['id']}")
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 @rate_limited
 def search_artists(
-    name: str,
+    name: str | None = None,
     country: str | None = None,
     artist_type: str | None = None,
     gender: str | None = None,
+    area: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
     limit: int = 5,
+    offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for artists with specific filters.
-    Prefer search_entities for simple name searches; use this when filtering
-    by country, type, or gender.
+    Always use strict=True when searching by filters without a name to get exact matches.
+    Without strict mode, filter-only queries return fuzzy-ranked results that may not match the filters.
+    Keep limit low (default 5) to avoid excessive queries. Do not use this tool to dump large result sets.
     Args:
         name: Artist name
         country: ISO 3166-1 alpha-2 country code
         artist_type: 'person', 'group', 'orchestra', 'choir', 'character', 'other'
         gender: 'male', 'female', 'other', 'not applicable'
+        area: Area name the artist is from (e.g. city or region)
+        begin_date: Artist begin date (formation for groups, birth for persons).
+            Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an artist was created, formed, founded, or born.
+        end_date: Artist end date (dissolution for groups, death for persons).
+            Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an artist was dissolved, disbanded, or died.
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs = {"artist": name, "limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
+    if name:
+        kwargs["artist"] = name
     if country:
         kwargs["country"] = country
     if artist_type:
         kwargs["type"] = artist_type
     if gender:
         kwargs["gender"] = gender
+    if area:
+        kwargs["area"] = area
+    if begin_date:
+        kwargs["begin"] = begin_date
+    if end_date:
+        kwargs["end"] = end_date
+
+    if not any((name, country, artist_type, gender, area, begin_date, end_date)):
+        return "Please provide at least one search parameter."
 
     result = musicbrainzngs.search_artists(**kwargs)
     items = result.get("artist-list", [])
@@ -303,7 +401,7 @@ def search_artists(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 @rate_limited
 def search_releases(
@@ -311,20 +409,27 @@ def search_releases(
     artist: str | None = None,
     label: str | None = None,
     barcode: str | None = None,
+    catno: str | None = None,
+    format: str | None = None,
     limit: int = 5,
+    offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for releases with specific filters.
-    Prefer search_entities for simple title searches; use this when filtering
-    by artist, label, or barcode.
+    Also use this to find a release by its barcode.
     Args:
         title: Release title
         artist: Artist name
         label: Label name
         barcode: UPC/EAN barcode
+        catno: Catalog number (insensitive to case, spaces, and separators)
+        format: Medium format (e.g. '12" Vinyl', 'CD', 'Digital Media')
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
     if title:
         kwargs["release"] = title
     if artist:
@@ -332,9 +437,13 @@ def search_releases(
     if label:
         kwargs["label"] = label
     if barcode:
-        kwargs["barcode"] = barcode
+        kwargs["barcode"] = "".join(c for c in barcode if c.isdigit())
+    if catno:
+        kwargs["catno"] = catno
+    if format:
+        kwargs["format"] = format
 
-    if not any((title, artist, label, barcode)):
+    if not any((title, artist, label, barcode, catno, format)):
         return "Please provide at least one search parameter."
 
     result = musicbrainzngs.search_releases(**kwargs)
@@ -344,11 +453,70 @@ def search_releases(
         rtitle = i.get("title")
         rartist = i.get("artist-credit-phrase", "Unknown")
         date = i.get("date", "?")
-        lines.append(f"- {rtitle} by {rartist} ({date}) | release ID: {i['id']}")
+        country = i.get("country", "")
+        labels = ", ".join(
+            li.get("label", {}).get("name", "")
+            for li in i.get("label-info-list", [])
+            if li.get("label", {}).get("name")
+        )
+        catnos = ", ".join(
+            li.get("catalog-number", "") for li in i.get("label-info-list", []) if li.get("catalog-number")
+        )
+        formats = ", ".join(m.get("format", "") for m in i.get("medium-list", []) if m.get("format"))
+        rg = i.get("release-group", {})
+        rg_info = f" | release-group ID: {rg['id']}" if rg.get("id") else ""
+        extras = " | ".join(filter(None, [date, country, formats, labels, catnos]))
+        lines.append(f"- {rtitle} by {rartist} ({extras}) | release ID: {i['id']}{rg_info}")
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_recordings(
+    title: str | None = None,
+    artist: str | None = None,
+    release: str | None = None,
+    isrc: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+    strict: bool = False,
+) -> str:
+    """
+    Search for recordings with specific filters.
+    Args:
+        title: Recording title
+        artist: Artist name
+        release: Release title the recording appears on
+        isrc: International Standard Recording Code
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
+    """
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
+    if title:
+        kwargs["recording"] = title
+    if artist:
+        kwargs["artist"] = artist
+    if release:
+        kwargs["release"] = release
+    if isrc:
+        kwargs["isrc"] = isrc
+
+    if not any((title, artist, release, isrc)):
+        return "Please provide at least one search parameter."
+
+    result = musicbrainzngs.search_recordings(**kwargs)
+    items = result.get("recording-list", [])
+    lines = [f"Found {len(items)} recordings:"]
+    for i in items:
+        rtitle = i.get("title")
+        rartist = i.get("artist-credit-phrase", "Unknown")
+        dur = _fmt_duration(i.get("length"))
+        lines.append(f"- {rtitle} by {rartist} ({dur}) | recording ID: {i['id']}")
+    return "\n".join(lines)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 @rate_limited
 def search_release_groups(
@@ -356,18 +524,20 @@ def search_release_groups(
     artist: str | None = None,
     release_group_type: str | None = None,
     limit: int = 5,
+    offset: int = 0,
+    strict: bool = False,
 ) -> str:
     """
     Search for release groups (albums/EPs/singles) with specific filters.
-    Prefer search_entities for simple title searches; use this when filtering
-    by artist or type.
     Args:
         title: Release group title
         artist: Artist name
         release_group_type: 'album', 'ep', 'single', 'broadcast', 'other'
         limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+        strict: If True, all filters must match (default False for fuzzy ranking)
     """
-    kwargs: dict[str, Any] = {"limit": limit}
+    kwargs: dict[str, Any] = {"limit": limit, "offset": offset, "strict": strict}
     if title:
         kwargs["releasegroup"] = title
     if artist:
@@ -390,18 +560,220 @@ def search_release_groups(
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-@rate_limited
-def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit: int = 10) -> str:
+def search_labels(
+    name: str,
+    label_type: str | None = None,
+    country: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for record labels.
+    Args:
+        name: Label name
+        label_type: e.g. 'Original Production', 'Distributor', 'Holding', 'Reissue Production'
+        country: ISO 3166-1 alpha-2 country code
+        begin_date: Label begin date (founding). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a label was founded or started.
+        end_date: Label end date (closing). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a label was closed or shut down.
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"label:{name}"]
+    if label_type:
+        parts.append(f'type:"{label_type}"')
+    if country:
+        parts.append(f"country:{country}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
+    return _search_entities("label", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_works(
+    name: str, artist: str | None = None, work_type: str | None = None, limit: int = 5, offset: int = 0
+) -> str:
+    """
+    Search for musical works (compositions).
+    Args:
+        name: Work name
+        artist: Composer or lyricist name
+        work_type: e.g. 'Song', 'Opera', 'Symphony', 'Concerto'
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"work:{name}"]
+    if artist:
+        parts.append(f"artist:{artist}")
+    if work_type:
+        parts.append(f"type:{work_type}")
+    return _search_entities("work", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_areas(
+    name: str,
+    area_type: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for geographic areas (countries, cities, etc.).
+    Args:
+        name: Area name
+        area_type: e.g. 'Country', 'City', 'Subdivision', 'Municipality'
+        begin_date: Area begin date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an area was established.
+        end_date: Area end date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an area ceased to exist.
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"area:{name}"]
+    if area_type:
+        parts.append(f"type:{area_type}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
+    return _search_entities("area", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_events(
+    name: str,
+    artist: str | None = None,
+    event_type: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for music events (concerts, festivals, etc.).
+    Args:
+        name: Event name
+        artist: Artist related to the event
+        event_type: e.g. 'Concert', 'Festival', 'Convention/Expo'
+        begin_date: Event begin date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an event started or took place.
+        end_date: Event end date. Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when an event ended.
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"event:{name}"]
+    if artist:
+        parts.append(f"artist:{artist}")
+    if event_type:
+        parts.append(f"type:{event_type}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
+    return _search_entities("event", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_instruments(name: str, instrument_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
+    """
+    Search for musical instruments.
+    Args:
+        name: Instrument name
+        instrument_type: e.g. 'Wind instrument', 'String instrument', 'Percussion instrument', 'Electronic instrument'
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"instrument:{name}"]
+    if instrument_type:
+        parts.append(f"type:{instrument_type}")
+    return _search_entities("instrument", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_places(
+    name: str,
+    place_type: str | None = None,
+    area: str | None = None,
+    begin_date: str | None = None,
+    end_date: str | None = None,
+    limit: int = 5,
+    offset: int = 0,
+) -> str:
+    """
+    Search for places (venues, studios, etc.).
+    Args:
+        name: Place name
+        place_type: e.g. 'Studio', 'Venue', 'Religious building'
+        area: Area name the place is in
+        begin_date: Place begin date (opening). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a place opened or was established.
+        end_date: Place end date (closing). Supports 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'.
+            Use when the user asks when a place closed.
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"place:{name}"]
+    if place_type:
+        parts.append(f"type:{place_type}")
+    if area:
+        parts.append(f"area:{area}")
+    if begin_date:
+        parts.append(f"begin:{begin_date}")
+    if end_date:
+        parts.append(f"end:{end_date}")
+    return _search_entities("place", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def search_series(name: str, series_type: str | None = None, limit: int = 5, offset: int = 0) -> str:
+    """
+    Search for series (release series, tours, etc.).
+    Args:
+        name: Series name
+        series_type: e.g. 'Release group series', 'Tour', 'Festival'
+        limit: Max results (default 5)
+        offset: Number of results to skip for pagination (default 0)
+    """
+    parts = [f"series:{name}"]
+    if series_type:
+        parts.append(f"type:{series_type}")
+    return _search_entities("series", " AND ".join(parts), limit=limit, offset=offset)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def get_artist_details(
+    artist_id: MBID,
+    alias_limit: int = 10,
+    discography_limit: int = 10,
+    discography_offset: int = 0,
+    release_group_type: str | None = None,
+) -> str:
     """
     Get comprehensive info about an artist including aliases, tags,
     and their discography (Release Groups) with MBIDs.
-    Shows first release groups; use get_artist_discography for the full paged list.
     Args:
         artist_id: The MBID
         alias_limit: Max number of aliases to show (default 10)
         discography_limit: Max number of release groups to show (default 10)
+        discography_offset: Paging offset for the discography (default 0)
+        release_group_type: Filter discography by type: 'album', 'single', 'ep', 'broadcast', 'other'
     """
     res = musicbrainzngs.get_artist_by_id(
         artist_id,
@@ -409,19 +781,24 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
             "aliases",
             "tags",
             "ratings",
-            "release-groups",
             "url-rels",
+            "annotation",
         ],
     )
     a = res["artist"]
-    tags = _fmt_tags(a)
-    aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
+    aliases, tags = _extract_aliases_and_tags(a, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in a.get("url-relation-list", []))
 
-    rg_list = sorted(
-        a.get("release-group-list", []),
-        key=lambda rg: rg.get("first-release-date", "9999"),
-    )
+    browse_kwargs: dict[str, Any] = {
+        "artist": artist_id,
+        "limit": min(discography_limit, 100),
+        "offset": discography_offset,
+    }
+    if release_group_type:
+        browse_kwargs["release_type"] = release_group_type
+    rg_res = musicbrainzngs.browse_release_groups(**browse_kwargs)
+    rg_list = rg_res.get("release-group-list", [])
+    rg_count = rg_res.get("release-group-count", len(rg_list))
     albums = []
     for rg in rg_list:
         rtype = rg.get("type", "Unknown")
@@ -443,49 +820,23 @@ def get_artist_details(artist_id: str, alias_limit: int = 10, discography_limit:
         f"Aliases: {aliases or 'None'}",
         f"MBID: {a['id']}",
     ]
+    _append_extras(parts, a)
     if urls:
         parts.append(f"URLs:\n{urls}")
-    parts.append(
-        f"\nDISCOGRAPHY (Showing first {discography_limit} of {len(rg_list)} release groups. "
-        f"Use get_artist_discography for full paged list):\n" + "\n".join(albums[:discography_limit])
+
+    showing = f"{discography_offset + 1}–{discography_offset + len(rg_list)}" if rg_list else "0"
+    hint = (
+        " Increase discography_limit or use discography_offset to page."
+        if rg_count > discography_offset + len(rg_list)
+        else ""
     )
+    parts.append(f"\nDISCOGRAPHY (Showing {showing} of {rg_count} release groups.{hint})\n" + "\n".join(albums))
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_artist_discography(
-    artist_id: str,
-    limit: int = 25,
-    offset: int = 0,
-) -> str:
-    """
-    Get a paged discography (release groups) for an artist.
-    Use this for complete discographies; get_artist_details only shows the first 10.
-    Args:
-        artist_id: The MBID
-        limit: Max results (default 25)
-        offset: Paging offset
-    """
-    res = musicbrainzngs.browse_release_groups(
-        artist=artist_id,
-        limit=min(limit, 100),
-        offset=offset,
-        includes=["releases"],
-    )
-    items = res.get("release-group-list", [])
-    count = res.get("release-group-count", len(items))
-    lines = [f"Discography for artist {artist_id} (Showing {len(items)} of {count}):"]
-    for i in items:
-        rtype = i.get("type", "Unknown")
-        date = i.get("first-release-date", "????")
-        lines.append(f"- {i['title']} ({date}) [{rtype}] | release-group ID: {i['id']}")
-    return "\n".join(lines)
-
-
-@mcp.tool()
-@cached_tool()
-def get_release_details(release_id: str) -> str:
+def get_release_details(release_id: MBID) -> str:
     """Get tracklist with durations, barcode, and label for a specific release.
     Takes a release_id (a specific edition), NOT a release_group_id.
     To get tracks for an album concept, use get_album_tracks with a release_group_id."""
@@ -497,6 +848,7 @@ def get_release_details(release_id: str) -> str:
             "artist-credits",
             "media",
             "release-groups",
+            "annotation",
         ],
     )
     r = res["release"]
@@ -511,6 +863,7 @@ def get_release_details(release_id: str) -> str:
     country = r.get("country", "N/A")
     rg = r.get("release-group", {})
     rg_type = rg.get("type", "N/A")
+    rg_tags = _fmt_tags(rg)
 
     parts = [
         f"Title: {r['title']}",
@@ -521,18 +874,22 @@ def get_release_details(release_id: str) -> str:
         f"Type: {rg_type}",
         f"Barcode: {barcode}",
         f"Label: {labels or 'N/A'}",
+        f"Tags: {rg_tags or 'None listed'}",
+        f"Release Group: {rg.get('title', 'N/A')} | release-group ID: {rg.get('id', 'N/A')}",
         f"MBID: {release_id}",
-        "\nTracklist:\n" + "\n".join(tracks),
     ]
+    _append_extras(parts, r)
+    parts.append("\nTracklist:\n" + "\n".join(tracks))
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
+def get_recording_details(recording_id: MBID, releases_limit: int = 25) -> str:
     """
-    Get recording details: artist, duration, ISRCs, tags, and which
-    releases (albums/singles) it appears on.
+    Get recording details: artist, duration, ISRCs, performer credits
+    (instruments, vocals), tags, and which releases (albums/singles) it appears on.
+    Use get_album_tracks to see performers for all tracks on an album at once.
     Args:
         recording_id: The MBID
         releases_limit: Max number of releases to show (default 25)
@@ -545,6 +902,9 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
             "isrcs",
             "tags",
             "ratings",
+            "work-level-rels",
+            "artist-rels",
+            "annotation",
         ],
     )
     rec = res["recording"]
@@ -558,6 +918,21 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
 
     rating_str = _fmt_rating(rec)
 
+    # Extract performer credits from artist relationships
+    performers = _format_performers(rec.get("artist-relation-list", []))
+
+    # Extract linked works and their artist relationships (composers, lyricists)
+    works = []
+    for rel in rec.get("work-relation-list", []):
+        w = rel.get("work", {})
+        w_title = w.get("title", "?")
+        w_id = w.get("id", "")
+        creators = []
+        for ar in w.get("artist-relation-list", []):
+            creators.append(f"{ar['type'].capitalize()}: {ar['artist']['name']}")
+        creators_str = f" — {', '.join(creators)}" if creators else ""
+        works.append(f"  - {w_title}{creators_str} | work ID: {w_id}")
+
     parts = [
         f"Title: {rec['title']}",
         f"Artist: {artist}",
@@ -566,9 +941,16 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {recording_id}",
-        f"\nAppears on ({len(releases)} releases):",
-        *releases[:releases_limit],
     ]
+    _append_extras(parts, rec)
+    if performers:
+        parts.append(f"\nPerformers ({len(performers)}):")
+        parts.extend(performers)
+    if works:
+        parts.append(f"\nWorks ({len(works)}):")
+        parts.extend(works)
+    parts.append(f"\nAppears on ({len(releases)} releases):")
+    parts.extend(releases[:releases_limit])
     if len(releases) > releases_limit:
         parts.append(
             f"  ... and {len(releases) - releases_limit} more."
@@ -578,10 +960,12 @@ def get_recording_details(recording_id: str, releases_limit: int = 25) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_album_tracks(release_group_id: str) -> str:
-    """Fetches the tracklist with durations for a release group (album/EP/single).
+def get_album_tracks(release_group_id: MBID) -> str:
+    """Fetches the tracklist with durations and performer credits for a release group
+    (album/EP/single). Each track lists the musicians and their instruments/roles.
+    Best tool for "who plays what on this album?" questions.
     Takes a release_group_id (NOT a release_id). For a specific release's tracklist,
     use get_release_details instead."""
     rg_result = musicbrainzngs.get_release_group_by_id(release_group_id, includes=["releases"])
@@ -590,22 +974,113 @@ def get_album_tracks(release_group_id: str) -> str:
         return "No releases found for this release group."
 
     release_id = releases[0]["id"]
-    release_details = musicbrainzngs.get_release_by_id(release_id, includes=["recordings"])
+    release_details = musicbrainzngs.get_release_by_id(
+        release_id, includes=["recordings", "artist-rels", "recording-level-rels"]
+    )
     r = release_details["release"]
-    tracks = _format_tracks(r.get("medium-list", []))
+    tracks = _format_tracks(r.get("medium-list", []), include_performers=True)
     if not tracks:
         return "No tracks found."
     header = f"Tracklist from release: {r.get('title', '?')} ({r.get('date', '?')}) | release ID: {release_id}"
     if len(releases) > 1:
         header += f"\n({len(releases)} releases available; use get_release_group_details to see all editions)"
-    return header + "\n" + "\n".join(tracks)
+    result = header + "\n" + "\n".join(tracks)
+    # Check if any recording had performer credits
+    has_performers = any(
+        rec.get("artist-relation-list")
+        for medium in r.get("medium-list", [])
+        for t in medium.get("track-list", [])
+        for rec in [t.get("recording", {})]
+    )
+    if not has_performers:
+        result += (
+            "\n\n(No per-track performer credits found in MusicBrainz for this release."
+            " Try get_recording_details on individual tracks, or"
+            f" get_entity_relationships(entity_type='release', entity_id='{release_id}',"
+            " include_rels=['artist-rels']) for release-level credits.)"
+        )
+    return result
 
 
-@mcp.tool()
+RECORDING_REL_TYPES = {"artist", "place", "work", "url", "label", "area"}
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_release_group_details(release_group_id: str, releases_limit: int = 25) -> str:
+def get_album_recording_rels(release_group_id: MBID, rel_type: str) -> str:
+    """Get recording-level relationships of a given type for all tracks on an album in one call.
+    Returns deduplicated entities with relationship types and date ranges.
+    Use this instead of calling get_entity_relationships on each recording individually.
+    Takes a release_group_id (NOT a release_id).
+
+    Common queries:
+      - "Which studios were used?" → rel_type='place'
+      - "Who engineered/produced/mixed?" → rel_type='artist'
+      - "What compositions are these recordings of?" → rel_type='work'
+
+    Args:
+        release_group_id: The MBID of the release group (album concept)
+        rel_type: Relationship target type: 'artist', 'place', 'work', 'url', 'label', 'area'
+    """
+    if rel_type not in RECORDING_REL_TYPES:
+        return f"Invalid rel_type '{rel_type}'. Must be one of: {', '.join(sorted(RECORDING_REL_TYPES))}"
+
+    rg_result = musicbrainzngs.get_release_group_by_id(release_group_id, includes=["releases"])
+    releases = rg_result["release-group"].get("release-list", [])
+    if not releases:
+        return "No releases found for this release group."
+
+    release_id = releases[0]["id"]
+    release_details = musicbrainzngs.get_release_by_id(
+        release_id, includes=["recordings", "recording-level-rels", f"{rel_type}-rels"]
+    )
+    r = release_details["release"]
+
+    # Collect unique (rel_type_str, entity_name, entity_id) with date ranges
+    entities: dict[tuple[str, str, str], list[str]] = {}
+    rel_list_key = f"{rel_type}-relation-list"
+    for medium in r.get("medium-list", []):
+        for t in medium.get("track-list", []):
+            rec = t.get("recording", {})
+            for rel in rec.get(rel_list_key, []):
+                rtype = rel.get("type", "unknown")
+                entity = rel.get(rel_type, {})
+                name = entity.get("name", entity.get("title", "Unknown"))
+                eid = entity.get("id", "")
+                begin = rel.get("begin", "")
+                end = rel.get("end", "")
+                date_str = f"{begin or '?'}–{end or '?'}" if begin or end else ""
+                key = (rtype, name, eid)
+                if date_str and date_str not in entities.get(key, []):
+                    entities.setdefault(key, []).append(date_str)
+                else:
+                    entities.setdefault(key, [])
+
+    if not entities:
+        return (
+            f"No {rel_type} relationships found on recordings for this release."
+            f" Try get_entity_relationships(entity_type='release', entity_id='{release_id}',"
+            f" include_rels=['{rel_type}-rels']) for release-level relationships."
+        )
+
+    header = (
+        f"{rel_type.capitalize()} relationships for: {r.get('title', '?')} ({r.get('date', '?')})"
+        f" | release ID: {release_id}"
+    )
+    lines = [header]
+    for (rtype, name, eid), dates in sorted(entities.items(), key=lambda x: (x[0][0], x[0][1])):
+        date_str = f" [{', '.join(dates)}]" if any(dates) else ""
+        id_str = f" | {rel_type} ID: {eid}" if eid else ""
+        lines.append(f"  - {rtype.replace('_', ' ').capitalize()}: {name}{date_str}{id_str}")
+    return "\n".join(lines)
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def get_release_group_details(release_group_id: MBID, releases_limit: int = 25) -> str:
     """Get details about a release group (the album/EP/single concept).
-    A release group contains one or more releases (specific editions).
+    A release group contains one or more releases (specific editions),
+    each shown with its label, catalog number, country, and format.
     Use get_release_details for a specific edition's tracklist and barcode.
     Args:
         release_group_id: The MBID
@@ -613,7 +1088,7 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
     """
     res = musicbrainzngs.get_release_group_by_id(
         release_group_id,
-        includes=["artists", "releases", "tags", "ratings", "url-rels"],
+        includes=["artists", "tags", "ratings", "url-rels", "annotation"],
     )
     rg = res["release-group"]
     tags = _fmt_tags(rg)
@@ -621,7 +1096,27 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
     rtype = rg.get("type", "Unknown")
     date = rg.get("first-release-date", "Unknown")
 
-    releases = [f"  - {r['title']} ({r.get('date', '?')}) | release ID: {r['id']}" for r in rg.get("release-list", [])]
+    # Fetch releases with label and media info for richer output
+    browse_res = musicbrainzngs.browse_releases(
+        release_group=release_group_id, includes=["labels", "media"], limit=min(releases_limit, 100)
+    )
+    release_list = browse_res.get("release-list", [])
+    release_count = browse_res.get("release-count", len(release_list))
+
+    releases = []
+    for r in release_list:
+        label_parts = []
+        for li in r.get("label-info-list", []):
+            lbl = li.get("label", {}).get("name")
+            cat = li.get("catalog-number")
+            if lbl:
+                label_parts.append(f"{lbl} ({cat})" if cat else lbl)
+        formats = [m.get("format", "") for m in r.get("medium-list", []) if m.get("format")]
+        info = [p for p in [r.get("date", ""), r.get("country", ""), "+".join(formats)] if p]
+        if label_parts:
+            info.append(", ".join(label_parts))
+        extra = f" ({' | '.join(info)})" if info else ""
+        releases.append(f"  - {r['title']}{extra} | release ID: {r['id']}")
 
     rating_str = _fmt_rating(rg)
 
@@ -633,25 +1128,26 @@ def get_release_group_details(release_group_id: str, releases_limit: int = 25) -
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {release_group_id}",
-        f"\nReleases in this group ({len(releases)}):",
-        *releases[:releases_limit],
     ]
-    if len(releases) > releases_limit:
+    _append_extras(parts, rg)
+    parts.append(f"\nReleases in this group ({release_count}):")
+    parts.extend(releases)
+    if release_count > releases_limit:
         parts.append(
-            f"  ... and {len(releases) - releases_limit} more."
+            f"  ... and {release_count - len(releases)} more."
             f" Use browse_entities(entity_type='releases', linked_type='release_group',"
             f" linked_id='{release_group_id}') for the full list."
         )
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_work_details(work_id: str) -> str:
+def get_work_details(work_id: MBID) -> str:
     """Get details about a musical work (composers, lyricists, etc.)."""
     res = musicbrainzngs.get_work_by_id(
         work_id,
-        includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings"],
+        includes=["artist-rels", "label-rels", "work-rels", "tags", "ratings", "annotation"],
     )
     w = res["work"]
     tags = _fmt_tags(w)
@@ -689,9 +1185,10 @@ def get_work_details(work_id: str) -> str:
         f"Tags: {tags or 'None listed'}",
         f"Rating: {rating_str}",
         f"MBID: {work_id}",
-        "\nCreators:",
-        *(creators or ["  - No creators listed"]),
     ]
+    _append_extras(parts, w)
+    parts.append("\nCreators:")
+    parts.extend(creators or ["  - No creators listed"])
     if publishers:
         parts.append("\nPublishers:")
         parts.extend(publishers)
@@ -701,9 +1198,9 @@ def get_work_details(work_id: str) -> str:
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_area_details(area_id: str, alias_limit: int = 10) -> str:
+def get_area_details(area_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a geographic area (country, city).
     Args:
         area_id: The MBID
@@ -711,7 +1208,7 @@ def get_area_details(area_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_area_by_id(
         area_id,
-        includes=["aliases", "url-rels"],
+        includes=["aliases", "url-rels", "annotation"],
     )
     a = res["area"]
     aliases = ", ".join(al["alias"] for al in a.get("alias-list", [])[:alias_limit])
@@ -726,7 +1223,28 @@ def get_area_details(area_id: str, alias_limit: int = 10) -> str:
         f"Aliases: {aliases or 'None'}",
         f"MBID: {area_id}",
     ]
+    _append_extras(parts, a)
     return "\n".join(parts)
+
+
+def _fmt_disambiguation(entity: dict[str, Any]) -> str:
+    """Return disambiguation string or empty string."""
+    return entity.get("disambiguation", "")
+
+
+def _fmt_annotation(entity: dict[str, Any]) -> str:
+    """Return annotation text or empty string."""
+    return entity.get("annotation", {}).get("text", "")
+
+
+def _append_extras(parts: list[str], entity: dict[str, Any]) -> None:
+    """Append disambiguation and annotation to output parts if present."""
+    disambiguation = _fmt_disambiguation(entity)
+    if disambiguation:
+        parts.append(f"Disambiguation: {disambiguation}")
+    annotation = _fmt_annotation(entity)
+    if annotation:
+        parts.append(f"\nAnnotation:\n{annotation}")
 
 
 def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10) -> tuple[str, str]:
@@ -736,9 +1254,9 @@ def _extract_aliases_and_tags(entity_dict: dict[str, Any], alias_limit: int = 10
     return aliases, tags
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_event_details(event_id: str, alias_limit: int = 10) -> str:
+def get_event_details(event_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a music event (concert, festival, etc.).
     Args:
         event_id: The MBID
@@ -746,7 +1264,7 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_event_by_id(
         event_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     ev = res["event"]
     aliases, tags = _extract_aliases_and_tags(ev, alias_limit)
@@ -763,12 +1281,13 @@ def get_event_details(event_id: str, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {event_id}",
     ]
+    _append_extras(parts, ev)
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
+def get_instrument_details(instrument_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a musical instrument.
     Args:
         instrument_id: The MBID
@@ -776,7 +1295,7 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_instrument_by_id(
         instrument_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     inst = res["instrument"]
     aliases, tags = _extract_aliases_and_tags(inst, alias_limit)
@@ -789,12 +1308,13 @@ def get_instrument_details(instrument_id: str, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {instrument_id}",
     ]
+    _append_extras(parts, inst)
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_place_details(place_id: str, alias_limit: int = 10) -> str:
+def get_place_details(place_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a place (venue, studio, etc.).
     Args:
         place_id: The MBID
@@ -802,7 +1322,7 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_place_by_id(
         place_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     pl = res["place"]
     aliases, tags = _extract_aliases_and_tags(pl, alias_limit)
@@ -820,12 +1340,13 @@ def get_place_details(place_id: str, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {place_id}",
     ]
+    _append_extras(parts, pl)
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_series_details(series_id: str, alias_limit: int = 10) -> str:
+def get_series_details(series_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a series (release series, tour, etc.).
     Args:
         series_id: The MBID
@@ -833,7 +1354,7 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_series_by_id(
         series_id,
-        includes=["aliases", "tags", "url-rels"],
+        includes=["aliases", "tags", "url-rels", "annotation"],
     )
     sr = res["series"]
     aliases, tags = _extract_aliases_and_tags(sr, alias_limit)
@@ -844,12 +1365,13 @@ def get_series_details(series_id: str, alias_limit: int = 10) -> str:
         f"Tags: {tags or 'None listed'}",
         f"MBID: {series_id}",
     ]
+    _append_extras(parts, sr)
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_label_details(label_id: str, alias_limit: int = 10) -> str:
+def get_label_details(label_id: MBID, alias_limit: int = 10) -> str:
     """Get details about a record label including type, area, tags, and URLs.
     Args:
         label_id: The MBID
@@ -857,11 +1379,10 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
     """
     res = musicbrainzngs.get_label_by_id(
         label_id,
-        includes=["aliases", "tags", "ratings", "url-rels"],
+        includes=["aliases", "tags", "ratings", "url-rels", "annotation"],
     )
     lb = res["label"]
-    tags = _fmt_tags(lb)
-    aliases = ", ".join(al["alias"] for al in lb.get("alias-list", [])[:alias_limit])
+    aliases, tags = _extract_aliases_and_tags(lb, alias_limit)
     urls = "\n".join(f"  - {r['type']}: {r['target']}" for r in lb.get("url-relation-list", []))
     lifespan = lb.get("life-span", {})
     begin = lifespan.get("begin", "?")
@@ -880,68 +1401,156 @@ def get_label_details(label_id: str, alias_limit: int = 10) -> str:
         f"Aliases: {aliases or 'None'}",
         f"MBID: {lb['id']}",
     ]
+    _append_extras(parts, lb)
     if urls:
         parts.append(f"URLs:\n{urls}")
     return "\n".join(parts)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def lookup_by_barcode(barcode: str) -> str:
-    """Finds a release by its UPC/EAN barcode."""
-    result = musicbrainzngs.search_releases(barcode=barcode, limit=5)
-    releases = result.get("release-list", [])
-    if not releases:
-        return f"No releases found for barcode {barcode}."
-    lines = [f"Releases for barcode {barcode}:"]
-    for r in releases:
-        artist = r.get("artist-credit-phrase", "Unknown")
-        date = r.get("date", "?")
-        lines.append(f"- {r['title']} by {artist} ({date}) | release ID: {r['id']}")
+def lookup_recording_by_isrc(isrc: str) -> str:
+    """
+    Lookup a recording by its International Standard Recording Code (ISRC).
+    This is the global ID used by Spotify, Apple Music, and record labels.
+    Accepts both formatted (FI-UM7-07-00377) and compact (FIUM70700377) forms.
+    """
+    isrc = isrc.replace("-", "").replace(" ", "").upper()
+    try:
+        res = musicbrainzngs.get_recordings_by_isrc(isrc, includes=["artists", "releases"])
+    except musicbrainzngs.ResponseError:
+        return f"No recording found for ISRC: {isrc}"
+
+    recordings = res.get("isrc", {}).get("recording-list", [])
+    if not recordings:
+        return f"No recording found for ISRC: {isrc}"
+
+    lines = [f"Found {len(recordings)} recording(s) for ISRC {isrc}:"]
+    for rec in recordings:
+        title = rec.get("title", "Unknown")
+        artist = rec.get("artist-credit-phrase", "Unknown")
+        rec_id = rec.get("id")
+        lines.append(f"  - {title} by {artist} | recording ID: {rec_id}")
+
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_entity_relationships(entity_type: str, entity_id: str) -> str:
+def lookup_work_by_iswc(iswc: str) -> str:
     """
-    Get relationships for any entity type (e.g., band members, producers,
-    recording studios, Wikipedia links).
+    Lookup a musical work (composition/sheet music) by its ISWC.
+    This is the global ID used by music publishers and royalty societies.
+    Accepts both formatted (T-345.246.800-1) and compact (T3452468001) forms.
+    """
+    # Normalize to formatted form: T-NNN.NNN.NNN-C
+    clean = iswc.replace("-", "").replace(".", "").replace(" ", "").upper()
+    if len(clean) == 11 and clean[0] == "T":
+        iswc = f"{clean[0]}-{clean[1:4]}.{clean[4:7]}.{clean[7:10]}-{clean[10]}"
+    else:
+        iswc = clean
+    try:
+        res = musicbrainzngs.get_works_by_iswc(iswc)
+    except musicbrainzngs.ResponseError:
+        return f"No works found for ISWC: {iswc}"
+
+    works = res.get("work-list", [])
+    if not works:
+        return f"No works found for ISWC: {iswc}"
+
+    lines = [f"Found {len(works)} work(s) for ISWC {iswc}:"]
+    for w in works:
+        title = w.get("title", "Unknown")
+        w_id = w.get("id")
+        lines.append(f"  - {title} | work ID: {w_id}")
+
+    return "\n".join(lines)
+
+
+ENTITY_LOOKUP_FUNCS: dict[str, str] = {
+    "artist": "get_artist_by_id",
+    "release": "get_release_by_id",
+    "release-group": "get_release_group_by_id",
+    "recording": "get_recording_by_id",
+    "work": "get_work_by_id",
+    "label": "get_label_by_id",
+    "area": "get_area_by_id",
+    "place": "get_place_by_id",
+    "event": "get_event_by_id",
+    "instrument": "get_instrument_by_id",
+    "series": "get_series_by_id",
+}
+
+# Relationship includes available for all entity types.
+ALL_REL_INCLUDES = [
+    "area-rels",
+    "artist-rels",
+    "event-rels",
+    "instrument-rels",
+    "label-rels",
+    "place-rels",
+    "recording-rels",
+    "release-group-rels",
+    "release-rels",
+    "series-rels",
+    "url-rels",
+    "work-rels",
+]
+
+
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
+@cached_tool()
+def get_entity_relationships(entity_type: str, entity_id: MBID, include_rels: list[str] | None = None) -> str:
+    """
+    Get relationships for any entity type.
+    For performer credits on recordings, prefer get_album_tracks (whole album)
+    or get_recording_details (single track) which include them directly.
+
+    Common queries and how to find them:
+      - Band members/lineup → entity_type='artist', artist-rels (member of band, founder, supporting musician)
+      - Recording studio → entity_type='recording', place-rels (recorded at, mixed at, engineered at)
+      - Mastering/pressing location → entity_type='release', place-rels (mastered at, manufactured at, pressed at)
+      - Producers/engineers → entity_type='recording', artist-rels (producer, engineer, mixer)
+      - Composers/lyricists → entity_type='work', artist-rels (composer, lyricist, writer, arranger)
+      - Wikipedia/Discogs/social links → any entity_type, url-rels
+      - Family relationships → entity_type='artist', artist-rels (parent, sibling, married)
+      - Label relationships → entity_type='release', label-rels (published by, distributed by)
+      - Samples/remixes → entity_type='recording', recording-rels (samples, remix of)
+
+    Note: studio/place info is usually on individual recordings, not on the release-group.
+    If place-rels returns nothing for a release-group, try on a recording instead.
+
     Args:
         entity_type: artist, release, release-group, recording, work, label, area,
                      place, event, instrument, series
         entity_id: The MBID (must match the entity_type)
+        include_rels: Which relationship types to fetch. Default (None) fetches
+            artist-rels and url-rels. Available types:
+            - area-rels: linked geographic areas
+            - artist-rels: linked artists (members, producers, performers, composers, family)
+            - event-rels: linked events (concerts, festivals)
+            - instrument-rels: linked instruments
+            - label-rels: linked labels (publishers, distributors)
+            - place-rels: linked places (recording/mixing/mastering studios, pressing plants, venues)
+            - recording-rels: linked recordings (samples, remixes, compilations)
+            - release-group-rels: linked release groups
+            - release-rels: linked releases
+            - series-rels: linked series (tours, release series)
+            - url-rels: linked URLs (Wikipedia, Discogs, Wikidata, official sites, streaming)
+            - work-rels: linked works (compositions, arrangements)
     """
-    valid_types = {
-        "artist": (musicbrainzngs.get_artist_by_id, ["artist-rels", "url-rels"]),
-        "release": (musicbrainzngs.get_release_by_id, ["artist-rels", "url-rels"]),
-        "release-group": (
-            musicbrainzngs.get_release_group_by_id,
-            ["artist-rels", "url-rels"],
-        ),
-        "recording": (
-            musicbrainzngs.get_recording_by_id,
-            ["artist-rels", "work-rels", "url-rels"],
-        ),
-        "work": (
-            musicbrainzngs.get_work_by_id,
-            ["artist-rels", "label-rels", "work-rels", "url-rels"],
-        ),
-        "label": (musicbrainzngs.get_label_by_id, ["artist-rels", "url-rels"]),
-        "area": (musicbrainzngs.get_area_by_id, ["area-rels", "url-rels"]),
-        "place": (musicbrainzngs.get_place_by_id, ["place-rels", "url-rels"]),
-        "event": (musicbrainzngs.get_event_by_id, ["artist-rels", "url-rels"]),
-        "instrument": (
-            musicbrainzngs.get_instrument_by_id,
-            ["instrument-rels", "url-rels"],
-        ),
-        "series": (musicbrainzngs.get_series_by_id, ["series-rels", "url-rels"]),
-    }
+    if entity_type not in ENTITY_LOOKUP_FUNCS:
+        return f"Invalid entity type. Choose from: {', '.join(ENTITY_LOOKUP_FUNCS.keys())}"
 
-    if entity_type not in valid_types:
-        return f"Invalid entity type. Choose from: {', '.join(valid_types.keys())}"
+    if include_rels is None:
+        includes = ["artist-rels", "url-rels"]
+    else:
+        invalid = [r for r in include_rels if r not in ALL_REL_INCLUDES]
+        if invalid:
+            return f"Invalid relationship types: {', '.join(invalid)}. Valid: {', '.join(ALL_REL_INCLUDES)}"
+        includes = include_rels
 
-    func, includes = valid_types[entity_type]
+    func = getattr(musicbrainzngs, ENTITY_LOOKUP_FUNCS[entity_type])
     res = func(entity_id, includes=includes)
     entity = res.get(entity_type)
     if not entity:
@@ -950,21 +1559,31 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
     lines = [f"Relationships for {entity_type} {entity_id}:"]
     found = False
 
+    # Entity keys that use "name" vs "title"
+    _TITLE_KEYS = {"work", "release", "release-group", "recording"}
+
     # Standardize relation list keys (artist-relation-list, url-relation-list, etc.)
     for key, value in entity.items():
         if key.endswith("-relation-list") and isinstance(value, list):
+            # Derive target entity type from key (e.g. "artist-relation-list" -> "artist")
+            rel_entity_type = key.removesuffix("-relation-list")
             for rel in value:
                 rtype = rel.get("type", "Unknown")
                 attrs = rel.get("attribute-list", [])
-                target = (
-                    rel.get("artist", {}).get("name")
-                    or rel.get("work", {}).get("title")
-                    or rel.get("release", {}).get("title")
-                    or rel.get("label", {}).get("name")
-                    or rel.get("target", "Unknown")
-                )
+                target_entity = rel.get(rel_entity_type, {})
+                name_key = "title" if rel_entity_type in _TITLE_KEYS else "name"
+                target_name = target_entity.get(name_key) or rel.get("target", "Unknown")
+                target_id = target_entity.get("id", "")
+
                 attrs_str = f" ({', '.join(attrs)})" if attrs else ""
-                lines.append(f"  - {rtype.capitalize()}{attrs_str}: {target}")
+                id_str = f" | {rel_entity_type} ID: {target_id}" if target_id else ""
+
+                # Date range (e.g. band membership periods)
+                begin = rel.get("begin", "")
+                end = rel.get("end", "")
+                date_str = f" [{begin or '?'}–{end or 'present'}]" if begin or end else ""
+
+                lines.append(f"  - {rtype.capitalize()}{attrs_str}: {target_name}{date_str}{id_str}")
                 found = True
 
     if not found:
@@ -973,9 +1592,9 @@ def get_entity_relationships(entity_type: str, entity_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_cover_art_urls(release_id: str) -> str:
+def get_cover_art_urls(release_id: MBID) -> str:
     """Get cover art image URLs for a specific release (edition)
     from the Cover Art Archive.
     Takes a release_id, NOT a release_group_id.
@@ -996,9 +1615,9 @@ def get_cover_art_urls(release_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
-def get_release_group_cover_art(release_group_id: str) -> str:
+def get_release_group_cover_art(release_group_id: MBID) -> str:
     """Get cover art image URLs for a release group (album/EP concept)
     from the Cover Art Archive.
     Takes a release_group_id, NOT a release_id.
@@ -1029,21 +1648,28 @@ def get_release_group_cover_art(release_group_id: str) -> str:
     return "\n".join(lines)
 
 
-@mcp.tool()
+@mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
 def search_entities_fuzzy(entity_type: str, query: str, limit: int = 5) -> str:
     """
     Typo-tolerant fuzzy search. Tries an exact search first, then falls back to
     fuzzy matching if no results are found.
-    Supports all entity types from search_entities (artist, release, recording,
-    label, work, release-group, area, event, instrument, place, series).
+    Supports entity types: artist, release, recording, label, work,
+    release-group, area, event, instrument, place, series.
     Use when the query may contain misspellings (e.g., 'Bjork' -> 'Björk').
     """
     # Try exact search first
-    exact = search_entities(entity_type=entity_type, query=query, limit=limit)
+    exact = _search_entities(entity_type=entity_type, query=query, limit=limit)
     if not exact.startswith("Found 0"):
         return exact
 
     # Fall back to fuzzy matching
     fuzzy_query = " ".join([f"{word}~" for word in query.split()])
-    return search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)
+    return _search_entities(entity_type=entity_type, query=fuzzy_query, limit=limit)
+
+
+@mcp.tool(annotations={"readOnlyHint": False, "idempotentHint": True, "openWorldHint": False})
+def clear_cache() -> str:
+    """Clear the local response cache. Only use when the user explicitly asks to refresh cached data."""
+    cache.clear()
+    return "Cache cleared."
