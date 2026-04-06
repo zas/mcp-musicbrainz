@@ -10,6 +10,7 @@ import musicbrainzngs
 from fastmcp import FastMCP
 
 from mcp_musicbrainz import __version__
+from mcp_musicbrainz.throttling.token_bucket import rate_limited
 
 #: MusicBrainz Identifier — a UUID that uniquely identifies an entity (artist, release, recording, etc.)
 MBID = NewType("MBID", str)
@@ -336,6 +337,7 @@ def browse_entities(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
+@rate_limited
 def search_artists(
     name: str | None = None,
     country: str | None = None,
@@ -401,6 +403,7 @@ def search_artists(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
+@rate_limited
 def search_releases(
     title: str | None = None,
     artist: str | None = None,
@@ -515,6 +518,7 @@ def search_recordings(
 
 @mcp.tool(annotations=TOOL_ANNOTATIONS)
 @cached_tool()
+@rate_limited
 def search_release_groups(
     title: str | None = None,
     artist: str | None = None,
